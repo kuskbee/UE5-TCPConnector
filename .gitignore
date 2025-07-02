@@ -72,3 +72,32 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+# — 추가: Visual Studio 사용자/캐시/로그 등
+# 사용자 설정
+*.user
+*.userosscache
+*.userprefs
+# 빌드 상태
+*.unsuccessfulbuild
+*.lastbuildstate
+# 인덱스/캐시
+*.ncb
+*.ipch/
+*.tlog/
+# 데이터베이스 프로젝트
+*.dbmdl
+# 프로파일링 세션
+*.psess
+*.vsp
+*.vspx
+# 로깅/추적
+*.log
+*.etl
+*.clog
+# Visual Studio 구성 파일
+*.vsconfig
+# .NET 관련
+*.ide
+# MonoDevelop
+*.pidb
