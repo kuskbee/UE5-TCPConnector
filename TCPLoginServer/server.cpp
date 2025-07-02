@@ -1,12 +1,62 @@
-#include <iostream>
+﻿#include <iostream>
+
+//WinSock
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 
-#pragma comment(lib, "ws2_32")
+//MySQL
+#include <jdbc/mysql_connection.h>
+#include <jdbc/cppconn/driver.h>
+#include <jdbc/cppconn/exception.h>
+#include <jdbc/cppconn/prepared_statement.h>
 
+//Ini
+#include "Utils/IniParser.h"
+#include <sstream>
+
+#pragma comment(lib, "ws2_32")
+#pragma comment(lib, "mysqlcppconn.lib")
 
 int main()
 {
+	// get database config
+	std::string ConfigPath = "config.ini";
+	std::string Section = "Database";
+	auto DbConfig = util::IniParser::ParseSection(ConfigPath, Section);
+
+	std::string Host = DbConfig["Host"];
+	std::string Port = DbConfig["Port"];
+	std::string User = DbConfig["User"];
+	std::string Pass = DbConfig["Password"];
+	std::string Schema = DbConfig["Schema"];
+
+	// sql
+	sql::Driver* driver;
+
+	try
+	{
+		driver = get_driver_instance();
+
+		std::stringstream Url;
+		Url << "tcp://" << Host << ":" << Port;
+		
+		std::unique_ptr<sql::Connection> conn(
+			driver->connect(Url.str(), User, Pass)
+		);
+
+		conn->setSchema(Schema);
+		
+		std::cout << "Database connection successful!" << std::endl;
+
+	}
+	catch (sql::SQLException& e)
+	{
+		std::cerr << "Could not connect to database. Error: " << e.what() << std::endl;
+		system("pause");
+		exit(1); // DB 연결 실패 시 서버 종료
+	}
+
+
 	WSAData wsaData;
 	int Result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (Result != 0)

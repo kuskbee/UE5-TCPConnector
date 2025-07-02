@@ -101,3 +101,16 @@ DerivedDataCache/*
 *.ide
 # MonoDevelop
 *.pidb
+
+#  MYSQL 작업 제거
+TCPLoginServer/libcrypto-1_1-x64.dll
+TCPLoginServer/libssl-1_1-x64.dll
+TCPLoginServer/mysqlcppconn-9-vs14.dll
+TCPLoginServer/mysqlConnector/*
+TCPLoginServer/config.ini
+
+#
+*.pdb
+*.iobj
+*.recipe
+*.ipdb
