@@ -1,8 +1,19 @@
 ﻿#include "server.h"
 
 #include <iostream>
+#include <chrono>
+#include <cstdint>
 #include <ws2tcpip.h>
-#include <Windows.h>
+
+uint64_t GetTimeStamp()
+{
+	// 시스템 시계를 UTC epoch(1970-01-01) 기준으로 읽어서
+	// 밀리초 단위 정수로 변환
+	using namespace std::chrono;
+	auto now = system_clock::now();
+	auto ms = duration_cast<milliseconds>(now.time_since_epoch());
+	return static_cast<uint64_t>(ms.count());
+}
 
 Server::~Server()
 {
@@ -115,26 +126,198 @@ void Server::HandleClient(SOCKET ClientSocket)
 	std::unique_ptr<sql::Connection, ConnDeleter> ClientConn;
 	ClientConn.reset(DbManager.GetConnection());
 
-	const char* HelloMsg = "Welcome to Hell";
-	int SendBytes = 0;
-
 	if (!ClientConn)
 	{
-		goto $END;
+		closesocket(ClientSocket);
+		std::cerr << "Failed to Get DB Conn, Client disconnected." << std::endl;
+		return;
 	}
 
-	Sleep(1000);
-	SendBytes = send(ClientSocket, HelloMsg, (int)strlen(HelloMsg), 0);
-	if (SendBytes > 0)
+	constexpr size_t READ_CHUNK = 64 * 1024; // 64KB
+	std::vector<char> RecvBuf;
+	RecvBuf.reserve(READ_CHUNK);
+
+	while(true)
 	{
-		std::cout << "Sent '" << HelloMsg << "' to the client." << std::endl;
-	}
-	else
-	{
-		std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
+		uint32_t MessageSize = 0;
+		ReceiveFlatBufferMessage(ClientSocket, RecvBuf, MessageSize);
+		
+		// FlatBuffer 검증
+		flatbuffers::Verifier verifier(
+			reinterpret_cast<const uint8_t*>(RecvBuf.data()), MessageSize);
+
+		if (!LoginProtocol::VerifyMessageEnvelopeBuffer(verifier))
+		{
+			std::cerr << "Invalid FlatBuffer received\n";
+			break;
+		}
+
+		// 메시지 디스패치
+		ProcessPacket(RecvBuf, ClientConn, ClientSocket);
 	}
 
-$END:
 	closesocket(ClientSocket);
 	std::cout << "Client disconnected." << std::endl;
+}
+
+void Server::ProcessPacket(std::vector<char>& RecvBuf, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+{
+	const LoginProtocol::MessageEnvelope* MsgEnvelope = LoginProtocol::GetMessageEnvelope(RecvBuf.data());
+	switch (MsgEnvelope->body_type())
+	{
+	case LoginProtocol::Payload_C2S_LoginRequest:
+	{
+		ProcessLoginRequest(MsgEnvelope, ClientConn, ClientSocket);
+		break;
+	}
+	case LoginProtocol::Payload_C2S_SignUpRequest:
+	{
+		ProcessSignUpRequest(MsgEnvelope, ClientConn, ClientSocket);
+		break;
+	}
+	default:
+		std::cerr << "Unknown payload type\n";
+		break;
+	}
+}
+
+void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+{
+	const LoginProtocol::C2S_SignUpRequest* SignUpReq = MsgEnvelope->body_as_C2S_SignUpRequest();
+	std::string UserId = SignUpReq->userid()->str();
+	std::string Password = SignUpReq->password()->str();
+	std::string Nickname = SignUpReq->nickname()->str();
+
+	SignUpStatus ResultStatus = DbManager.SignUp(
+		ClientConn.get(), UserId, Password, Nickname);
+
+	// 응답 FlatBuffer 작성
+	flatbuffers::FlatBufferBuilder Builder;
+	auto BodyOffset = LoginProtocol::CreateS2C_SignUpResponse(
+		Builder,
+		static_cast<LoginProtocol::ErrorCode>(ResultStatus)
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload_S2C_SignUpResponse,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(ClientSocket, Builder);
+}
+
+void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+{
+	const LoginProtocol::C2S_LoginRequest* LoginReq = MsgEnvelope->body_as_C2S_LoginRequest();
+	std::string UserId = LoginReq->userid()->str();
+	std::string Password = LoginReq->password()->str();
+
+	int PlayerId;
+	std::string Nickname;
+	LoginStatus ResultStatus = DbManager.Login(
+		ClientConn.get(), UserId, Password, PlayerId, Nickname);
+
+	// 응답 FlatBuffer 작성
+	flatbuffers::FlatBufferBuilder Builder;
+	auto NickOffset = Builder.CreateString(Nickname);
+	auto BodyOffset = LoginProtocol::CreateS2C_LoginResponse(
+		Builder,
+		static_cast<LoginProtocol::ErrorCode>(ResultStatus),
+		0,           // :TODO: session token 생략
+		NickOffset
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload_S2C_LoginResponse,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(ClientSocket, Builder);
+}
+
+bool Server::RecvAll(SOCKET Sock, char* RecvBuff, size_t RecvLen)
+{
+	size_t Received = 0;
+	while (Received < RecvLen)
+	{
+		int RecvBytes = recv(Sock, RecvBuff + Received, int(RecvLen - Received), MSG_WAITALL);
+		if (RecvBytes <= 0)
+		{
+			if (RecvBytes == 0)
+			{
+				std::cout << "[RecvAll] Client disconnected." << std::endl;
+			}
+			else
+			{
+				std::cerr << "RecvAll failed: " << WSAGetLastError() << std::endl;
+			}
+			return false;
+		}
+
+		Received += RecvBytes;
+	}
+	return true;
+}
+
+bool Server::SendAll(SOCKET Sock, char* SendBuff, size_t SendLen)
+{
+	size_t TotalSentBytes = 0;
+	while (TotalSentBytes < SendLen)
+	{
+		int SentBytes = send(Sock, SendBuff + TotalSentBytes, int(SendLen - TotalSentBytes), 0);
+		if (SentBytes < 0)
+		{
+			std::cerr << "SendAll failed: " << WSAGetLastError() << std::endl;
+			return false;
+		}
+		TotalSentBytes += SentBytes;
+	}
+	return true;
+}
+
+// 메시지 전송 함수
+bool Server::SendFlatBufferMessage(SOCKET Sock, flatbuffers::FlatBufferBuilder& Builder)
+{
+	// 1. 메시지 길이 (4바이트) 전송
+	uint32_t messageSize = Builder.GetSize();
+	uint32_t networkMessageSize = htonl(messageSize); // 네트워크 바이트 순서로 변환
+	if (SendAll(Sock, (char*)&networkMessageSize, sizeof(networkMessageSize)) == false)
+	{
+		std::cerr << "Send message size failed." << std::endl;
+		return false;
+	}
+
+	// 2. 실제 메시지 데이터 전송
+	if (SendAll(Sock, (char*)Builder.GetBufferPointer(), messageSize) == false)
+	{
+		std::cerr << "Send message data failed." << std::endl;
+		return false;
+	}
+	return true;
+}
+
+// 메시지 수신 함수
+bool Server::ReceiveFlatBufferMessage(SOCKET Sock, std::vector<char>& RecvBuf, uint32_t& outMessageSize)
+{
+	// 1. 메시지 길이 (4바이트) 수신
+	uint32_t networkMessageSize;
+	bool bRecv = RecvAll(Sock, (char*)&networkMessageSize, sizeof(networkMessageSize));
+	if (bRecv == false)
+	{
+		std::cerr << "Receive message size failed." << std::endl;
+		return false;
+	}
+	outMessageSize = ntohl(networkMessageSize); // 호스트 바이트 순서로 변환
+
+	// 2. 실제 메시지 데이터 수신
+	RecvBuf.resize(outMessageSize);
+	bRecv = RecvAll(Sock, (char*)RecvBuf.data(), outMessageSize);
+	if (bRecv == false)
+	{
+		std::cerr << "Receive message data failed." << std::endl;
+		return false;
+	}
+	return true;
 }
