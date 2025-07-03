@@ -1,7 +1,9 @@
-#pragma once
+﻿#pragma once
 
 #include <string>
 #include <jdbc/cppconn/driver.h>
+
+#include "DBQueryStatus.h"
 
 struct ConnDeleter {
 	void operator()(sql::Connection* p) const {
@@ -14,14 +16,25 @@ class DatabaseManager
 {
 public:
 	bool Initialize(std::string& ConfigPath);
-
+	
 	sql::Connection* GetConnection();
+
+	// Query Function
+	SignUpStatus SignUp(sql::Connection* Conn,
+				const std::string& UserId, 
+				const std::string& Password, 
+				const std::string& Nickname);
+
+	LoginStatus Login(sql::Connection* Conn,
+				const std::string& UserId,
+				const std::string& Password,
+				int& outPlayerId,
+				std::string& outNickname
+				);
 
 private:
 	sql::Driver* SqlDriver;
 	
-	std::unique_ptr<sql::Connection, ConnDeleter> conn;
-
 	std::string DBUser;
 	std::string DBPass;
 	std::string DBUrl;

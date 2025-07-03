@@ -42,6 +42,9 @@
     <ClInclude Include="server.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="DB\DBQueryStatus.h">
+      <Filter>DB</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Protocols\LoginProtocol.fbs">

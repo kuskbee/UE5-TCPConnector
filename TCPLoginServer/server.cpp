@@ -111,10 +111,20 @@ void Server::Run()
 
 void Server::HandleClient(SOCKET ClientSocket)
 {
-	//
+	// Initialize
+	std::unique_ptr<sql::Connection, ConnDeleter> ClientConn;
+	ClientConn.reset(DbManager.GetConnection());
+
 	const char* HelloMsg = "Welcome to Hell";
+	int SendBytes = 0;
+
+	if (!ClientConn)
+	{
+		goto $END;
+	}
+
 	Sleep(1000);
-	int SendBytes = send(ClientSocket, HelloMsg, (int)strlen(HelloMsg), 0);
+	SendBytes = send(ClientSocket, HelloMsg, (int)strlen(HelloMsg), 0);
 	if (SendBytes > 0)
 	{
 		std::cout << "Sent '" << HelloMsg << "' to the client." << std::endl;
@@ -124,6 +134,7 @@ void Server::HandleClient(SOCKET ClientSocket)
 		std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
 	}
 
+$END:
 	closesocket(ClientSocket);
 	std::cout << "Client disconnected." << std::endl;
 }
