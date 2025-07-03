@@ -1,110 +1,99 @@
-﻿#include <iostream>
+﻿#include "server.h"
 
-//WinSock
-#include <WinSock2.h>
+#include <iostream>
 #include <ws2tcpip.h>
+#include <Windows.h>
 
-//MySQL
-#include <jdbc/mysql_connection.h>
-#include <jdbc/cppconn/driver.h>
-#include <jdbc/cppconn/exception.h>
-#include <jdbc/cppconn/prepared_statement.h>
-
-//Ini
-#include "Utils/IniParser.h"
-#include <sstream>
-
-#pragma comment(lib, "ws2_32")
-#pragma comment(lib, "mysqlcppconn.lib")
-
-int main()
+Server::~Server()
 {
-	// get database config
+	Close();
+}
+
+bool Server::Initialize()
+{
+	std::cout << "Server Initialize Start" << std::endl;
+
 	std::string ConfigPath = "config.ini";
-	std::string Section = "Database";
-	auto DbConfig = util::IniParser::ParseSection(ConfigPath, Section);
 
-	std::string Host = DbConfig["Host"];
-	std::string Port = DbConfig["Port"];
-	std::string User = DbConfig["User"];
-	std::string Pass = DbConfig["Password"];
-	std::string Schema = DbConfig["Schema"];
-
-	// sql
-	sql::Driver* driver;
-
-	try
+	bool bSuccess = DbManager.Initialize(ConfigPath);
+	if (false == bSuccess)
 	{
-		driver = get_driver_instance();
-
-		std::stringstream Url;
-		Url << "tcp://" << Host << ":" << Port;
-		
-		std::unique_ptr<sql::Connection> conn(
-			driver->connect(Url.str(), User, Pass)
-		);
-
-		conn->setSchema(Schema);
-		
-		std::cout << "Database connection successful!" << std::endl;
-
+		std::cerr << "DatabaseManager Initialize failed" << std::endl;
+		return false;
 	}
-	catch (sql::SQLException& e)
-	{
-		std::cerr << "Could not connect to database. Error: " << e.what() << std::endl;
-		system("pause");
-		exit(1); // DB 연결 실패 시 서버 종료
-	}
-
 
 	WSAData wsaData;
 	int Result = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (Result != 0)
 	{
 		std::cerr << "WSAStartup failed: " << Result << std::endl;
-		return 1;
+		return false;
 	}
 
-	SOCKET ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	ListenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (ListenSocket == INVALID_SOCKET)
 	{
 		std::cerr << "Socket creation failed: " << WSAGetLastError() << std::endl;
 		WSACleanup();
-		return 1;
+		return false;
 	}
 
 	sockaddr_in ListenSocketAddr;
 	memset(&ListenSocketAddr, 0, sizeof(ListenSocketAddr));
-	ListenSocketAddr.sin_family = AF_INET;	
+	ListenSocketAddr.sin_family = AF_INET;
 	ListenSocketAddr.sin_addr.s_addr = INADDR_ANY; //****
 	ListenSocketAddr.sin_port = htons(8881);
 	Result = bind(ListenSocket, (sockaddr*)&ListenSocketAddr, sizeof(ListenSocketAddr));
-	if (Result == SOCKET_ERROR) {
+	if (Result == SOCKET_ERROR)
+	{
 		std::cerr << "Bind failed: " << WSAGetLastError() << std::endl;
 		closesocket(ListenSocket);
 		WSACleanup();
 		return 1;
 	}
 
-	Result = listen(ListenSocket, SOMAXCONN);
-	if (Result == SOCKET_ERROR) {
-		std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
+	std::cout << "Server Initialize End" << std::endl;
+
+	return true;
+}
+
+void Server::Close()
+{
+	if (ListenSocket != INVALID_SOCKET)
+	{
 		closesocket(ListenSocket);
-		WSACleanup();
-		return 1;
+		ListenSocket = INVALID_SOCKET;
+	}
+
+	WSACleanup();
+}
+
+void Server::Run()
+{
+	if (ListenSocket == INVALID_SOCKET) 
+	{
+		std::cerr << "Invalid ListenSocket in Run()." << std::endl;
+		return; 
+	}
+
+	int Result = listen(ListenSocket, SOMAXCONN);
+	if (Result == SOCKET_ERROR)
+	{
+		std::cerr << "Listen failed: " << WSAGetLastError() << std::endl;
+		Close();
+		return;
 	}
 
 	std::cout << "Server is listening on port 8881..." << std::endl;
 
-	SOCKET ClientSocket;
-	sockaddr_in ClientSocketAddr;
-	memset(&ClientSocketAddr, 0, sizeof(ClientSocketAddr));
-	int ClientAddrSize = sizeof(ClientSocketAddr);
-
 	while (true)
 	{
+		sockaddr_in ClientSocketAddr;
+		memset(&ClientSocketAddr, 0, sizeof(ClientSocketAddr));
+		int AddrLen = sizeof(ClientSocketAddr);
+		
 		std::cout << "Waiting for client to connect..." << std::endl;
-		ClientSocket = accept(ListenSocket, (sockaddr*)&ClientSocketAddr, &ClientAddrSize);
+		SOCKET ClientSocket = accept(ListenSocket, (sockaddr*)&ClientSocketAddr, &AddrLen);
 		if (ClientSocket == INVALID_SOCKET)
 		{
 			std::cerr << "Accept failed: " << WSAGetLastError() << std::endl;
@@ -115,22 +104,26 @@ int main()
 		inet_ntop(AF_INET, &ClientSocketAddr, ClientIP, INET_ADDRSTRLEN);
 		std::cout << "Client connected from : " << ClientIP << std::endl;
 
-		//
-		const char* HelloMsg = "Welcome to Hell";
-		int SendResult = send(ClientSocket, HelloMsg, (int)strlen(HelloMsg), 0);
-		if (SendResult != SOCKET_ERROR)
-		{
-			std::cout << "Sent '" << HelloMsg << "' to the client." << std::endl;
-		}
-		else
-		{
-			std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
-		}
-
-		closesocket(ClientSocket);
-		std::cout << "Client disconnected." << std::endl;
+		std::thread(&Server::HandleClient, this, ClientSocket).detach();
 	}
 
-	closesocket(ListenSocket);
-	WSACleanup();
+}
+
+void Server::HandleClient(SOCKET ClientSocket)
+{
+	//
+	const char* HelloMsg = "Welcome to Hell";
+	Sleep(1000);
+	int SendBytes = send(ClientSocket, HelloMsg, (int)strlen(HelloMsg), 0);
+	if (SendBytes > 0)
+	{
+		std::cout << "Sent '" << HelloMsg << "' to the client." << std::endl;
+	}
+	else
+	{
+		std::cerr << "Send failed: " << WSAGetLastError() << std::endl;
+	}
+
+	closesocket(ClientSocket);
+	std::cout << "Client disconnected." << std::endl;
 }
