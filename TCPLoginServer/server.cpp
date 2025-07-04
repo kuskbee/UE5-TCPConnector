@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <ws2tcpip.h>
+#include "Utils/UuidHelper.h"
 
 uint64_t GetTimeStamp()
 {
@@ -140,7 +141,12 @@ void Server::HandleClient(SOCKET ClientSocket)
 	while(true)
 	{
 		uint32_t MessageSize = 0;
-		ReceiveFlatBufferMessage(ClientSocket, RecvBuf, MessageSize);
+		bool bRecv = ReceiveFlatBufferMessage(ClientSocket, RecvBuf, MessageSize);
+		if (false == bRecv)
+		{
+			std::cerr << "Failed Receive FlatBuffer Message" << std::endl;
+			break;
+		}
 		
 		// FlatBuffer 검증
 		flatbuffers::Verifier verifier(
@@ -218,13 +224,20 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	LoginStatus ResultStatus = DbManager.Login(
 		ClientConn.get(), UserId, Password, PlayerId, Nickname);
 
+	std::string SessionToken = "-";
+	if (ResultStatus == LoginStatus::Success)
+	{
+		SessionToken = util::UuidHelper::GenerateSessionToken();
+	}
+
 	// 응답 FlatBuffer 작성
 	flatbuffers::FlatBufferBuilder Builder;
 	auto NickOffset = Builder.CreateString(Nickname);
+	auto TokenOffset = Builder.CreateString(SessionToken);
 	auto BodyOffset = LoginProtocol::CreateS2C_LoginResponse(
 		Builder,
 		static_cast<LoginProtocol::ErrorCode>(ResultStatus),
-		0,           // :TODO: session token 생략
+		TokenOffset,
 		NickOffset
 	);
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(

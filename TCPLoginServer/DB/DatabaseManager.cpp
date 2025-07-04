@@ -131,7 +131,7 @@ LoginStatus DatabaseManager::Login(sql::Connection* Conn, const std::string& Use
 	try
 	{
 		std::unique_ptr<sql::PreparedStatement> pstmt(Conn->prepareStatement(
-			"SELECT player_id, password, nickname FROM users WHERE userid = ?"
+			"SELECT id, password, nickname FROM users WHERE userid = ?"
 		));
 		pstmt->setString(1, UserId);
 

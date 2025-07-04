@@ -14,6 +14,8 @@
 //#include "Sockets.h"
 //#include "Common/TcpSocketBuilder.h"
 
+#include "Utils.h"
+
 void ULoginClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -103,7 +105,12 @@ void ULoginClientSubsystem::NetworkPolling()
 	while (Socket && Socket->HasPendingData(Size))
 	{
 		uint32_t MessageSize = 0;
-		ReceiveFlatBufferMessage(RecvBuf, MessageSize);
+		bool bRecv = ReceiveFlatBufferMessage(RecvBuf, MessageSize);
+		if (false == bRecv)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Failed ReceiveFlatBufferMessasge."));
+			break;
+		}
 
 		// FlatBuffer 검증
 		flatbuffers::Verifier verifier(
@@ -147,21 +154,23 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	uint32_t networkMessageSize = 0;
 	TArray<uint8_t> HeaderBuffer;
 	int32 HeaderSize = (int32)sizeof(uint32_t);
-	HeaderBuffer.AddZeroed();
+	HeaderBuffer.AddZeroed(HeaderSize);
 	
 	int ReadBytes = 0;
-	bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes, ESocketReceiveFlags::WaitAll);
+	bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message size failed."));
 		return false;
 	}
+
+	FMemory::Memcpy(&networkMessageSize, HeaderBuffer.GetData(), sizeof(uint32_t));
 	outMessageSize = ntohl(networkMessageSize); // 호스트 바이트 순서로 변환
 
 	// 2. 실제 메시지 데이터 수신
 
 	RecvBuf.SetNumUninitialized(outMessageSize);
-	bRecv = Socket->Recv(RecvBuf.GetData(), outMessageSize, ReadBytes, ESocketReceiveFlags::WaitAll);
+	bRecv = Socket->Recv(RecvBuf.GetData(), outMessageSize, ReadBytes);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message data failed."));
@@ -176,6 +185,7 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 	if (!MsgEnvelope)
 	{
 		UE_LOG(LogTemp, Error, TEXT("[ProcessPacket] Failed to GetMessageEnvelope"));
+		return;
 	}
 
 	switch (MsgEnvelope->body_type())
@@ -199,7 +209,7 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 void ULoginClientSubsystem::ProcessLoginResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope)
 {
 	const LoginProtocol::S2C_LoginResponse* LoginRes = MsgEnvelope->body_as_S2C_LoginResponse();
-	const uint16 ErrCode = LoginRes->error_code();
+	const ELoginServerErrorCode ErrCode = static_cast<ELoginServerErrorCode>(LoginRes->error_code());
 
 	const char* Utf8Nickname = LoginRes->nickname()->c_str();
 	const FString Nickname = FString(UTF8_TO_TCHAR(Utf8Nickname));
@@ -214,7 +224,58 @@ void ULoginClientSubsystem::ProcessLoginResponse(const LoginProtocol::MessageEnv
 void ULoginClientSubsystem::ProcessSignUpResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope)
 {
 	const LoginProtocol::S2C_SignUpResponse* SignUpRes = MsgEnvelope->body_as_S2C_SignUpResponse();
-	const uint16 ErrCode = SignUpRes->error_code();
+	const ELoginServerErrorCode ErrCode = static_cast<ELoginServerErrorCode>(SignUpRes->error_code());
 	
 	OnSignUpResponseDelegate.Broadcast(ErrCode);
+}
+
+void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)
+{
+	std::string UserIdCharBuf = TCHAR_TO_UTF8(*UserId);
+	std::string PasswordCharBuf = TCHAR_TO_UTF8(*Password);
+
+	flatbuffers::FlatBufferBuilder Builder;
+	auto UserIdOffset = Builder.CreateString(UserIdCharBuf);
+	auto PasswordOffset = Builder.CreateString(PasswordCharBuf);
+	auto BodyOffset = LoginProtocol::CreateC2S_LoginRequest(
+		Builder,
+		UserIdOffset,
+		PasswordOffset
+	);
+
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload_C2S_LoginRequest,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(Builder);
+}
+
+void ULoginClientSubsystem::SendSignUpRequest(const FString& UserId, const FString& Password, const FString& Nickname)
+{
+	std::string UserIdCharBuf = TCHAR_TO_UTF8(*UserId);
+	std::string PasswordCharBuf = TCHAR_TO_UTF8(*Password);
+	std::string NicknameCharBuf = TCHAR_TO_UTF8(*Nickname);
+
+	flatbuffers::FlatBufferBuilder Builder;
+	auto UserIdOffset = Builder.CreateString(UserIdCharBuf);
+	auto PasswordOffset = Builder.CreateString(PasswordCharBuf);
+	auto NicknameOffset = Builder.CreateString(NicknameCharBuf);
+	auto BodyOffset = LoginProtocol::CreateC2S_SignUpRequest(
+		Builder,
+		UserIdOffset,
+		PasswordOffset,
+		NicknameOffset
+	);
+
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload_C2S_SignUpRequest,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(Builder);
 }

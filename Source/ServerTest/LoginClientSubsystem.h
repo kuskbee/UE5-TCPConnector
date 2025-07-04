@@ -6,10 +6,11 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "flatbuffers/flatbuffers.h"
 #include "LoginProtocol_generated.h"
+#include "NetworkTypeDefine.h"
 #include "LoginClientSubsystem.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLoginResponse, uint16, ErrCode, FString, Nickname, FString, SessionToken);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSignUpResponse, uint16, ErrCode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLoginResponse, ELoginServerErrorCode, ErrCode, FString, Nickname, FString, SessionToken);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSignUpResponse, ELoginServerErrorCode, ErrCode);
 
 UCLASS()
 class SERVERTEST_API ULoginClientSubsystem : public UGameInstanceSubsystem
@@ -28,6 +29,12 @@ public:
 	void DisconnectFromServer();
 
 	bool IsConnect();
+
+	UFUNCTION(BlueprintCallable)
+	void SendLoginRequest(const FString& UserId, const FString& Password);
+
+	UFUNCTION(BlueprintCallable)
+	void SendSignUpRequest(const FString& UserId, const FString& Password, const FString& Nickname);
 
 private:
 	void NetworkPolling();

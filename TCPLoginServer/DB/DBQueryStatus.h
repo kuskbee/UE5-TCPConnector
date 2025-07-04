@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 
-enum class SignUpStatus : uint16_t
+enum class SignUpStatus : uint8_t
 {
 	Success,
 	DuplicateUserId,
@@ -9,7 +9,7 @@ enum class SignUpStatus : uint16_t
 	OtherError
 };
 
-enum class LoginStatus : uint16_t
+enum class LoginStatus : uint8_t
 {
 	Success,
 	UserIdNotFound,

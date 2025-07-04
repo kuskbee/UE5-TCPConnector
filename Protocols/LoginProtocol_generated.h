@@ -114,7 +114,7 @@ inline const char *EnumNameS2C_Message(S2C_Message e) {
   return EnumNamesS2C_Message()[index];
 }
 
-enum ErrorCode : uint16_t {
+enum ErrorCode : uint8_t {
   ErrorCode_Success = 0,
   ErrorCode_Login_Fail_UserNotFound = 1,
   ErrorCode_Login_Fail_InvalidPassword = 2,
@@ -385,7 +385,7 @@ struct S2C_LoginResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
     VT_NICKNAME = 8
   };
   LoginProtocol::ErrorCode error_code() const {
-    return static_cast<LoginProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+    return static_cast<LoginProtocol::ErrorCode>(GetField<uint8_t>(VT_ERROR_CODE, 0));
   }
   const ::flatbuffers::String *session_token() const {
     return GetPointer<const ::flatbuffers::String *>(VT_SESSION_TOKEN);
@@ -395,7 +395,7 @@ struct S2C_LoginResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table 
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ERROR_CODE, 1) &&
            VerifyOffset(verifier, VT_SESSION_TOKEN) &&
            verifier.VerifyString(session_token()) &&
            VerifyOffset(verifier, VT_NICKNAME) &&
@@ -409,7 +409,7 @@ struct S2C_LoginResponseBuilder {
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_error_code(LoginProtocol::ErrorCode error_code) {
-    fbb_.AddElement<uint16_t>(S2C_LoginResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+    fbb_.AddElement<uint8_t>(S2C_LoginResponse::VT_ERROR_CODE, static_cast<uint8_t>(error_code), 0);
   }
   void add_session_token(::flatbuffers::Offset<::flatbuffers::String> session_token) {
     fbb_.AddOffset(S2C_LoginResponse::VT_SESSION_TOKEN, session_token);
@@ -542,11 +542,11 @@ struct S2C_SignUpResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table
     VT_ERROR_CODE = 4
   };
   LoginProtocol::ErrorCode error_code() const {
-    return static_cast<LoginProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+    return static_cast<LoginProtocol::ErrorCode>(GetField<uint8_t>(VT_ERROR_CODE, 0));
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ERROR_CODE, 1) &&
            verifier.EndTable();
   }
 };
@@ -556,7 +556,7 @@ struct S2C_SignUpResponseBuilder {
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_error_code(LoginProtocol::ErrorCode error_code) {
-    fbb_.AddElement<uint16_t>(S2C_SignUpResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+    fbb_.AddElement<uint8_t>(S2C_SignUpResponse::VT_ERROR_CODE, static_cast<uint8_t>(error_code), 0);
   }
   explicit S2C_SignUpResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -637,7 +637,7 @@ struct S2C_MatchmakingResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::
     VT_PORT = 8
   };
   LoginProtocol::ErrorCode error_code() const {
-    return static_cast<LoginProtocol::ErrorCode>(GetField<uint16_t>(VT_ERROR_CODE, 0));
+    return static_cast<LoginProtocol::ErrorCode>(GetField<uint8_t>(VT_ERROR_CODE, 0));
   }
   const ::flatbuffers::String *ip_address() const {
     return GetPointer<const ::flatbuffers::String *>(VT_IP_ADDRESS);
@@ -647,7 +647,7 @@ struct S2C_MatchmakingResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<uint16_t>(verifier, VT_ERROR_CODE, 2) &&
+           VerifyField<uint8_t>(verifier, VT_ERROR_CODE, 1) &&
            VerifyOffset(verifier, VT_IP_ADDRESS) &&
            verifier.VerifyString(ip_address()) &&
            VerifyField<uint16_t>(verifier, VT_PORT, 2) &&
@@ -660,7 +660,7 @@ struct S2C_MatchmakingResponseBuilder {
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_error_code(LoginProtocol::ErrorCode error_code) {
-    fbb_.AddElement<uint16_t>(S2C_MatchmakingResponse::VT_ERROR_CODE, static_cast<uint16_t>(error_code), 0);
+    fbb_.AddElement<uint8_t>(S2C_MatchmakingResponse::VT_ERROR_CODE, static_cast<uint8_t>(error_code), 0);
   }
   void add_ip_address(::flatbuffers::Offset<::flatbuffers::String> ip_address) {
     fbb_.AddOffset(S2C_MatchmakingResponse::VT_IP_ADDRESS, ip_address);

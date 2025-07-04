@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include <iostream>
 #include <objbase.h>
@@ -12,8 +12,8 @@ namespace util
 class UuidHelper
 {
 public:
-    // UUID¸¦ ¹®ÀÚ¿­·Î º¯È¯
-    std::string UuidToString(const UUID& uuid)
+    // UUIDë¥¼ ë¬¸ìì—´ë¡œ ë³€í™˜
+    static std::string UuidToString(const UUID& uuid)
     {
         std::stringstream ss;
         ss << std::hex << std::uppercase << std::setfill('0');
@@ -34,14 +34,14 @@ public:
         return ss.str();
     }
 
-    // UUID »ı¼º
-    std::string GenerateSessionToken()
+    // UUID ìƒì„±
+    static std::string GenerateSessionToken()
     {
         UUID uuid;
-        // UUID »ı¼º. ¼º°ø ½Ã RPC_S_OK ¹İÈ¯
+        // UUID ìƒì„±. ì„±ê³µ ì‹œ RPC_S_OK ë°˜í™˜
         RPC_STATUS status = UuidCreate(&uuid);
 
-        // »ı¼º ½ÇÆĞ ¿¡·¯
+        // ìƒì„± ì‹¤íŒ¨ ì—ëŸ¬
         if (status != RPC_S_OK)
         {
             std::cout << "[ERROR] Failed to Generate SessionToken" << std::endl;

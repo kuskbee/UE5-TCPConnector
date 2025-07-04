@@ -20,7 +20,7 @@ enum S2C_Message : ushort
 
 
 // 서버가 응답 시 사용할 공통 에러 코드
-enum ErrorCode : ushort 
+enum ErrorCode : uint8 
 {
     Success,
 	// 로그인 에러
