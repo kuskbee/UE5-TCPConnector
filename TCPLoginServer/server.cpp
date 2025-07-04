@@ -281,16 +281,16 @@ bool Server::SendAll(SOCKET Sock, char* SendBuff, size_t SendLen)
 bool Server::SendFlatBufferMessage(SOCKET Sock, flatbuffers::FlatBufferBuilder& Builder)
 {
 	// 1. 메시지 길이 (4바이트) 전송
-	uint32_t messageSize = Builder.GetSize();
-	uint32_t networkMessageSize = htonl(messageSize); // 네트워크 바이트 순서로 변환
-	if (SendAll(Sock, (char*)&networkMessageSize, sizeof(networkMessageSize)) == false)
+	uint32_t MessageSize = Builder.GetSize();
+	uint32_t NetworkMessageSize = htonl(MessageSize); // 네트워크 바이트 순서로 변환
+	if (SendAll(Sock, (char*)&NetworkMessageSize, sizeof(NetworkMessageSize)) == false)
 	{
 		std::cerr << "Send message size failed." << std::endl;
 		return false;
 	}
 
 	// 2. 실제 메시지 데이터 전송
-	if (SendAll(Sock, (char*)Builder.GetBufferPointer(), messageSize) == false)
+	if (SendAll(Sock, (char*)Builder.GetBufferPointer(), MessageSize) == false)
 	{
 		std::cerr << "Send message data failed." << std::endl;
 		return false;
