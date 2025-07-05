@@ -25,11 +25,11 @@ public:
 private:
 	void HandleClient(SOCKET ClientSocket);
 
-	void ProcessPacket(std::vector<char>& RecvBuf, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket);
+	void ProcessPacket(std::vector<char>& RecvBuf, sql::Connection* ClientConn, SOCKET ClientSocket);
 
-	void ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket);
+	void ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 
-	void ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket);
+	void ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 
 	bool RecvAll(SOCKET sock, char* buf, size_t len);
 

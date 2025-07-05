@@ -124,8 +124,7 @@ void Server::Run()
 void Server::HandleClient(SOCKET ClientSocket)
 {
 	// Initialize
-	std::unique_ptr<sql::Connection, ConnDeleter> ClientConn;
-	ClientConn.reset(DbManager.GetConnection());
+	sql::Connection* ClientConn = DbManager.GetConnection();
 
 	if (!ClientConn)
 	{
@@ -166,7 +165,7 @@ void Server::HandleClient(SOCKET ClientSocket)
 	std::cout << "Client disconnected." << std::endl;
 }
 
-void Server::ProcessPacket(std::vector<char>& RecvBuf, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+void Server::ProcessPacket(std::vector<char>& RecvBuf, sql::Connection* ClientConn, SOCKET ClientSocket)
 {
 	const LoginProtocol::MessageEnvelope* MsgEnvelope = LoginProtocol::GetMessageEnvelope(RecvBuf.data());
 	switch (MsgEnvelope->body_type())
@@ -187,7 +186,7 @@ void Server::ProcessPacket(std::vector<char>& RecvBuf, std::unique_ptr<sql::Conn
 	}
 }
 
-void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
 {
 	const LoginProtocol::C2S_SignUpRequest* SignUpReq = MsgEnvelope->body_as_C2S_SignUpRequest();
 	std::string UserId = SignUpReq->userid()->str();
@@ -195,7 +194,7 @@ void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvel
 	std::string Nickname = SignUpReq->nickname()->str();
 
 	SignUpStatus ResultStatus = DbManager.SignUp(
-		ClientConn.get(), UserId, Password, Nickname);
+		ClientConn, UserId, Password, Nickname);
 
 	// 응답 FlatBuffer 작성
 	flatbuffers::FlatBufferBuilder Builder;
@@ -213,7 +212,7 @@ void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvel
 	SendFlatBufferMessage(ClientSocket, Builder);
 }
 
-void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, std::unique_ptr<sql::Connection, ConnDeleter>& ClientConn, SOCKET ClientSocket)
+void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
 {
 	const LoginProtocol::C2S_LoginRequest* LoginReq = MsgEnvelope->body_as_C2S_LoginRequest();
 	std::string UserId = LoginReq->userid()->str();
@@ -222,7 +221,7 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	int PlayerId;
 	std::string Nickname;
 	LoginStatus ResultStatus = DbManager.Login(
-		ClientConn.get(), UserId, Password, PlayerId, Nickname);
+		ClientConn, UserId, Password, PlayerId, Nickname);
 
 	std::string SessionToken = "-";
 	if (ResultStatus == LoginStatus::Success)
