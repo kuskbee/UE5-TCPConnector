@@ -12,3 +12,11 @@ enum class ELoginServerErrorCode : uint8
 	ELS_InvalidRequest UMETA(DisplayName = "InvalidRequest"),
 	ELS_ServerError UMETA(DisplayName = "ServerError"),
 };
+
+UENUM(BlueprintType)
+enum class EPlayerState : uint8
+{
+	EPS_Lobby UMETA(DisplayName = "Lobby"),     // 로비에 입장한 상태
+	EPS_Ready UMETA(DisplayName = "Ready"),     // 로비에서 준비 완료한 상태
+	EPS_InGame UMETA(DisplayName = "InGame")     // 게임에 입장한 상태
+};

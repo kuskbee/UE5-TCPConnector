@@ -6,6 +6,8 @@ enum C2S_Message : ushort
 	C2S_KeepAlive,
 	C2S_LoginRequest,
 	C2S_SignUpRequest,
+	C2S_PlayerListRequest,
+	C2S_GameReadyRequest,
 	C2S_MatchmakingRequest
 }
 
@@ -15,9 +17,12 @@ enum S2C_Message : ushort
 	S2C_KeepAlive,
 	S2C_LoginResponse,
 	S2C_SignUpResponse,
+	S2C_PlayerListResponse,
+	S2C_PlayerInOutLobby,
+	S2C_GameReady,
+	S2C_StartGame,
 	S2C_MatchmakingResponse
 }
-
 
 // 서버가 응답 시 사용할 공통 에러 코드
 enum ErrorCode : uint8 
@@ -34,6 +39,20 @@ enum ErrorCode : uint8
     // 공통 에러
     InvalidRequest,
     ServerError
+}
+
+enum PlayerState : uint8
+{
+	Lobby,
+	Ready,
+	InGame,
+}
+
+table Player
+{
+	user_id : string (id: 0);
+	nickname : string (id: 1);
+	state : PlayerState (id: 2);
 }
 
 //------------------------------------
@@ -69,6 +88,37 @@ table S2C_SignUpResponse
 }
 
 //------------------------------------
+table C2S_PlayerListRequest { }
+
+table S2C_PlayerListResponse
+{
+	players : [Player];
+}
+//------------------------------------
+table S2C_PlayerInOutLobby
+{
+	user_id: string;
+	is_join: bool;
+}
+//------------------------------------
+table C2S_GameReadyRequest
+{
+	session_token: string;
+	is_ready : bool;
+}
+
+table S2C_GameReady
+{
+	user_id: string;
+	state : PlayerState;
+}
+//------------------------------------
+table S2C_StartGame
+{
+	dedi_ip_address: string;
+	dedi_port: ushort;
+}
+//------------------------------------
 table C2S_MatchmakingRequest
 {
 	session_token: string (required);
@@ -89,12 +139,18 @@ union Payload
 	C2S_KeepAlive,
 	C2S_LoginRequest,
 	C2S_SignUpRequest,
+	C2S_PlayerListRequest,
+	C2S_GameReadyRequest,
 	C2S_MatchmakingRequest,
 
 	// S2C
 	S2C_KeepAlive,
 	S2C_LoginResponse,
 	S2C_SignUpResponse,
+	S2C_PlayerListResponse,
+	S2C_GameReady,
+	S2C_PlayerInOutLobby,
+	S2C_StartGame,
 	S2C_MatchmakingResponse
 }
 

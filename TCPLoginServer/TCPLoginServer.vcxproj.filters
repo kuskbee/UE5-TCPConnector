@@ -45,6 +45,9 @@
     <ClInclude Include="DB\DBQueryStatus.h">
       <Filter>DB</Filter>
     </ClInclude>
+    <ClInclude Include="PlayerSession.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\Protocols\LoginProtocol.fbs">

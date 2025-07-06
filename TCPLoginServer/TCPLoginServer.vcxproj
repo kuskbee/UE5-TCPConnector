@@ -138,6 +138,7 @@
   <ItemGroup>
     <ClInclude Include="DB\DatabaseManager.h" />
     <ClInclude Include="DB\DBQueryStatus.h" />
+    <ClInclude Include="PlayerSession.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="Utils\IniParser.h" />
     <ClInclude Include="Utils\UuidHelper.h" />

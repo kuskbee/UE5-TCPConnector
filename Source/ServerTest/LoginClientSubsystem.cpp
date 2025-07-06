@@ -14,6 +14,8 @@
 //#include "Sockets.h"
 //#include "Common/TcpSocketBuilder.h"
 
+#include "UObject/EnumProperty.h"
+
 #include "Utils.h"
 
 void ULoginClientSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -190,14 +192,19 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 
 	switch (MsgEnvelope->body_type())
 	{
-	case LoginProtocol::Payload_S2C_LoginResponse:
+	case LoginProtocol::Payload::S2C_LoginResponse:
 	{
 		ProcessLoginResponse(MsgEnvelope);
 		break;
 	}
-	case LoginProtocol::Payload_S2C_SignUpResponse:
+	case LoginProtocol::Payload::S2C_SignUpResponse:
 	{
 		ProcessSignUpResponse(MsgEnvelope);
+		break;
+	}
+	case LoginProtocol::Payload::S2C_PlayerListResponse:
+	{
+		ProcessPlayerListResponse(MsgEnvelope);
 		break;
 	}
 	default:
@@ -229,6 +236,35 @@ void ULoginClientSubsystem::ProcessSignUpResponse(const LoginProtocol::MessageEn
 	OnSignUpResponseDelegate.Broadcast(ErrCode);
 }
 
+void ULoginClientSubsystem::ProcessPlayerListResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+{
+	const LoginProtocol::S2C_PlayerListResponse* PlayerListRes = MsgEnvelope->body_as_S2C_PlayerListResponse();
+
+	TArray<FPlayerInfo> PlayerInfos;
+
+	UE_LOG(LogTemp, Warning, TEXT("[PlayerList] Received Player List, Num : %d"), PlayerListRes->players()->size());
+
+	for (auto Player : *PlayerListRes->players())
+	{
+		const char* Utf8UserId = Player->user_id()->c_str();
+		const FString UserId = FString(UTF8_TO_TCHAR(Utf8UserId));
+
+		const char* Utf8Nickname = Player->nickname()->c_str();
+		const FString Nickname = FString(UTF8_TO_TCHAR(Utf8Nickname));
+
+		EPlayerState PlyState = static_cast<EPlayerState>(Player->state());
+
+		PlayerInfos.Add(FPlayerInfo(UserId, Nickname, PlyState));
+
+		UE_LOG(LogTemp, Warning, TEXT("[PlayerList] UserId : %s, NickName : %s, State : %s"), 
+			*UserId, *Nickname, *StaticEnum<EPlayerState>()->GetNameStringByValue(static_cast<int64>(PlyState)));
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[PlayerList] Received Player List, Num : %d"), PlayerInfos.Num());
+
+	OnPlayerListResponseDelegate.Broadcast(PlayerInfos);
+}
+
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)
 {
 	std::string UserIdCharBuf = TCHAR_TO_UTF8(*UserId);
@@ -246,7 +282,7 @@ void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FStrin
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
 		Builder,
 		GetTimeStamp(),
-		LoginProtocol::Payload_C2S_LoginRequest,
+		LoginProtocol::Payload::C2S_LoginRequest,
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
@@ -273,7 +309,21 @@ void ULoginClientSubsystem::SendSignUpRequest(const FString& UserId, const FStri
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
 		Builder,
 		GetTimeStamp(),
-		LoginProtocol::Payload_C2S_SignUpRequest,
+		LoginProtocol::Payload::C2S_SignUpRequest,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(Builder);
+}
+
+void ULoginClientSubsystem::SendPlayerListRequest()
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto BodyOffset = LoginProtocol::CreateC2S_PlayerListRequest(Builder);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::C2S_PlayerListRequest,
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);

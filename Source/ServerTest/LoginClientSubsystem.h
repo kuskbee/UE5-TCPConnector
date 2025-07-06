@@ -7,10 +7,12 @@
 #include "flatbuffers/flatbuffers.h"
 #include "LoginProtocol_generated.h"
 #include "NetworkTypeDefine.h"
+#include "PlayerInfo.h"
 #include "LoginClientSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLoginResponse, ELoginServerErrorCode, ErrCode, FString, Nickname, FString, SessionToken);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSignUpResponse, ELoginServerErrorCode, ErrCode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerListResponse, const TArray<FPlayerInfo>&, PlayerInfos);
 
 UCLASS()
 class SERVERTEST_API ULoginClientSubsystem : public UGameInstanceSubsystem
@@ -36,6 +38,9 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SendSignUpRequest(const FString& UserId, const FString& Password, const FString& Nickname);
 
+	UFUNCTION(BlueprintCallable)
+	void SendPlayerListRequest();
+
 private:
 	void NetworkPolling();
 
@@ -45,6 +50,7 @@ private:
 
 	void ProcessLoginResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessSignUpResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
+	void ProcessPlayerListResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 
 	TObjectPtr<FSocket> Socket;
 	FTimerHandle NetworkTimerHandle;
@@ -56,4 +62,7 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnSignUpResponse OnSignUpResponseDelegate;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnPlayerListResponse OnPlayerListResponseDelegate;
 };

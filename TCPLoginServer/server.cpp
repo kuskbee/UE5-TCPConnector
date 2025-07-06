@@ -160,6 +160,8 @@ void Server::HandleClient(SOCKET ClientSocket)
 		// 메시지 디스패치
 		ProcessPacket(RecvBuf, ClientConn, ClientSocket);
 	}
+	
+	CleanUpClientSession(ClientSocket);
 
 	closesocket(ClientSocket);
 	std::cout << "Client disconnected." << std::endl;
@@ -170,14 +172,19 @@ void Server::ProcessPacket(std::vector<char>& RecvBuf, sql::Connection* ClientCo
 	const LoginProtocol::MessageEnvelope* MsgEnvelope = LoginProtocol::GetMessageEnvelope(RecvBuf.data());
 	switch (MsgEnvelope->body_type())
 	{
-	case LoginProtocol::Payload_C2S_LoginRequest:
+	case LoginProtocol::Payload::C2S_LoginRequest:
 	{
 		ProcessLoginRequest(MsgEnvelope, ClientConn, ClientSocket);
 		break;
 	}
-	case LoginProtocol::Payload_C2S_SignUpRequest:
+	case LoginProtocol::Payload::C2S_SignUpRequest:
 	{
 		ProcessSignUpRequest(MsgEnvelope, ClientConn, ClientSocket);
+		break;
+	}
+	case LoginProtocol::Payload::C2S_PlayerListRequest:
+	{
+		ProcessPlayerListRequest(MsgEnvelope, ClientConn, ClientSocket);
 		break;
 	}
 	default:
@@ -205,7 +212,7 @@ void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvel
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
 		Builder,
 		GetTimeStamp(),
-		LoginProtocol::Payload_S2C_SignUpResponse,
+		LoginProtocol::Payload::S2C_SignUpResponse,
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
@@ -226,7 +233,16 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	std::string SessionToken = "-";
 	if (ResultStatus == LoginStatus::Success)
 	{
+		std::unique_lock<std::shared_mutex> Lock(SessionMutex);
+
 		SessionToken = util::UuidHelper::GenerateSessionToken();
+		
+		PlayerSessionMap[SessionToken] = PlayerSession{
+			PlayerId, UserId, Nickname, &ClientSocket,
+			PlayerState::Lobby
+		};
+		TokenByPlayerIdMap[PlayerId] = SessionToken;
+		TokenBySocketMap[ClientSocket] = SessionToken;
 	}
 
 	// 응답 FlatBuffer 작성
@@ -242,8 +258,41 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
 		Builder,
 		GetTimeStamp(),
-		LoginProtocol::Payload_S2C_LoginResponse,
+		LoginProtocol::Payload::S2C_LoginResponse,
 		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(ClientSocket, Builder);
+}
+
+void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
+{
+	flatbuffers::FlatBufferBuilder Builder;
+
+	std::vector<flatbuffers::Offset<LoginProtocol::Player>> Vec;
+	for (const auto& Player : PlayerSessionMap)
+	{
+		auto UserId = Builder.CreateString(Player.second.UserId);
+		auto Nickname = Builder.CreateString(Player.second.PlayerName);
+		Vec.emplace_back(LoginProtocol::CreatePlayer(
+			Builder,
+			UserId,
+			Nickname,
+			static_cast<LoginProtocol::PlayerState>(Player.second.CurrentState)
+		));
+		std::cout << "[PlayerList] UserId : " << Player.second.UserId;
+		std::cout << ", Nickname : " << Player.second.PlayerName;
+		std::cout << ", CurrState : " << (int)Player.second.CurrentState << std::endl;
+	}
+
+	auto PlayerVec = Builder.CreateVector(Vec);
+	auto ResList = LoginProtocol::CreateS2C_PlayerListResponse(Builder, PlayerVec);
+
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_PlayerListResponse,
+		ResList.Union()
 	);
 	Builder.Finish(SendMsgData);
 	SendFlatBufferMessage(ClientSocket, Builder);
@@ -332,4 +381,32 @@ bool Server::ReceiveFlatBufferMessage(SOCKET Sock, std::vector<char>& RecvBuf, u
 		return false;
 	}
 	return true;
+}
+
+void Server::CleanUpClientSession(SOCKET ClientSocket)
+{
+	std::string SessionToken;
+
+	{
+		std::shared_lock<std::shared_mutex> Lock(SessionMutex);
+		auto it = TokenBySocketMap.find(ClientSocket);
+		if(it == TokenBySocketMap.end())
+		{
+			// 이미 종료되거나 정리된 세션
+			return;
+		}
+		SessionToken = it->second;
+	}
+
+	std::unique_lock<std::shared_mutex> Lock(SessionMutex);
+
+	int32_t PlayerId = PlayerSessionMap[SessionToken].DbId;
+
+	// 3개 맵에서 모두 삭제
+	TokenBySocketMap.erase(ClientSocket);
+	TokenByPlayerIdMap.erase(PlayerId);
+	PlayerSessionMap.erase(SessionToken);
+
+	// 다른 클라이언트들에게 나갔다고 브로드캐스트
+
 }

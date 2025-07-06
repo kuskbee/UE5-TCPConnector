@@ -15,6 +15,9 @@ static_assert(FLATBUFFERS_VERSION_MAJOR == 25 &&
 
 namespace LoginProtocol {
 
+struct Player;
+struct PlayerBuilder;
+
 struct C2S_KeepAlive;
 struct C2S_KeepAliveBuilder;
 
@@ -33,6 +36,24 @@ struct C2S_SignUpRequestBuilder;
 struct S2C_SignUpResponse;
 struct S2C_SignUpResponseBuilder;
 
+struct C2S_PlayerListRequest;
+struct C2S_PlayerListRequestBuilder;
+
+struct S2C_PlayerListResponse;
+struct S2C_PlayerListResponseBuilder;
+
+struct S2C_PlayerInOutLobby;
+struct S2C_PlayerInOutLobbyBuilder;
+
+struct C2S_GameReadyRequest;
+struct C2S_GameReadyRequestBuilder;
+
+struct S2C_GameReady;
+struct S2C_GameReadyBuilder;
+
+struct S2C_StartGame;
+struct S2C_StartGameBuilder;
+
 struct C2S_MatchmakingRequest;
 struct C2S_MatchmakingRequestBuilder;
 
@@ -42,30 +63,36 @@ struct S2C_MatchmakingResponseBuilder;
 struct MessageEnvelope;
 struct MessageEnvelopeBuilder;
 
-enum C2S_Message : uint16_t {
-  C2S_Message_C2S_KeepAlive = 0,
-  C2S_Message_C2S_LoginRequest = 1,
-  C2S_Message_C2S_SignUpRequest = 2,
-  C2S_Message_C2S_MatchmakingRequest = 3,
-  C2S_Message_MIN = C2S_Message_C2S_KeepAlive,
-  C2S_Message_MAX = C2S_Message_C2S_MatchmakingRequest
+enum class C2S_Message : uint16_t {
+  C2S_KeepAlive = 0,
+  C2S_LoginRequest = 1,
+  C2S_SignUpRequest = 2,
+  C2S_PlayerListRequest = 3,
+  C2S_GameReadyRequest = 4,
+  C2S_MatchmakingRequest = 5,
+  MIN = C2S_KeepAlive,
+  MAX = C2S_MatchmakingRequest
 };
 
-inline const C2S_Message (&EnumValuesC2S_Message())[4] {
+inline const C2S_Message (&EnumValuesC2S_Message())[6] {
   static const C2S_Message values[] = {
-    C2S_Message_C2S_KeepAlive,
-    C2S_Message_C2S_LoginRequest,
-    C2S_Message_C2S_SignUpRequest,
-    C2S_Message_C2S_MatchmakingRequest
+    C2S_Message::C2S_KeepAlive,
+    C2S_Message::C2S_LoginRequest,
+    C2S_Message::C2S_SignUpRequest,
+    C2S_Message::C2S_PlayerListRequest,
+    C2S_Message::C2S_GameReadyRequest,
+    C2S_Message::C2S_MatchmakingRequest
   };
   return values;
 }
 
 inline const char * const *EnumNamesC2S_Message() {
-  static const char * const names[5] = {
+  static const char * const names[7] = {
     "C2S_KeepAlive",
     "C2S_LoginRequest",
     "C2S_SignUpRequest",
+    "C2S_PlayerListRequest",
+    "C2S_GameReadyRequest",
     "C2S_MatchmakingRequest",
     nullptr
   };
@@ -73,35 +100,47 @@ inline const char * const *EnumNamesC2S_Message() {
 }
 
 inline const char *EnumNameC2S_Message(C2S_Message e) {
-  if (::flatbuffers::IsOutRange(e, C2S_Message_C2S_KeepAlive, C2S_Message_C2S_MatchmakingRequest)) return "";
+  if (::flatbuffers::IsOutRange(e, C2S_Message::C2S_KeepAlive, C2S_Message::C2S_MatchmakingRequest)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesC2S_Message()[index];
 }
 
-enum S2C_Message : uint16_t {
-  S2C_Message_S2C_KeepAlive = 0,
-  S2C_Message_S2C_LoginResponse = 1,
-  S2C_Message_S2C_SignUpResponse = 2,
-  S2C_Message_S2C_MatchmakingResponse = 3,
-  S2C_Message_MIN = S2C_Message_S2C_KeepAlive,
-  S2C_Message_MAX = S2C_Message_S2C_MatchmakingResponse
+enum class S2C_Message : uint16_t {
+  S2C_KeepAlive = 0,
+  S2C_LoginResponse = 1,
+  S2C_SignUpResponse = 2,
+  S2C_PlayerListResponse = 3,
+  S2C_PlayerInOutLobby = 4,
+  S2C_GameReady = 5,
+  S2C_StartGame = 6,
+  S2C_MatchmakingResponse = 7,
+  MIN = S2C_KeepAlive,
+  MAX = S2C_MatchmakingResponse
 };
 
-inline const S2C_Message (&EnumValuesS2C_Message())[4] {
+inline const S2C_Message (&EnumValuesS2C_Message())[8] {
   static const S2C_Message values[] = {
-    S2C_Message_S2C_KeepAlive,
-    S2C_Message_S2C_LoginResponse,
-    S2C_Message_S2C_SignUpResponse,
-    S2C_Message_S2C_MatchmakingResponse
+    S2C_Message::S2C_KeepAlive,
+    S2C_Message::S2C_LoginResponse,
+    S2C_Message::S2C_SignUpResponse,
+    S2C_Message::S2C_PlayerListResponse,
+    S2C_Message::S2C_PlayerInOutLobby,
+    S2C_Message::S2C_GameReady,
+    S2C_Message::S2C_StartGame,
+    S2C_Message::S2C_MatchmakingResponse
   };
   return values;
 }
 
 inline const char * const *EnumNamesS2C_Message() {
-  static const char * const names[5] = {
+  static const char * const names[9] = {
     "S2C_KeepAlive",
     "S2C_LoginResponse",
     "S2C_SignUpResponse",
+    "S2C_PlayerListResponse",
+    "S2C_PlayerInOutLobby",
+    "S2C_GameReady",
+    "S2C_StartGame",
     "S2C_MatchmakingResponse",
     nullptr
   };
@@ -109,34 +148,34 @@ inline const char * const *EnumNamesS2C_Message() {
 }
 
 inline const char *EnumNameS2C_Message(S2C_Message e) {
-  if (::flatbuffers::IsOutRange(e, S2C_Message_S2C_KeepAlive, S2C_Message_S2C_MatchmakingResponse)) return "";
+  if (::flatbuffers::IsOutRange(e, S2C_Message::S2C_KeepAlive, S2C_Message::S2C_MatchmakingResponse)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesS2C_Message()[index];
 }
 
-enum ErrorCode : uint8_t {
-  ErrorCode_Success = 0,
-  ErrorCode_Login_Fail_UserNotFound = 1,
-  ErrorCode_Login_Fail_InvalidPassword = 2,
-  ErrorCode_SignUp_Fail_UsernameExists = 3,
-  ErrorCode_SignUp_Fail_NicknameExists = 4,
-  ErrorCode_Auth_Fail_InvalidToken = 5,
-  ErrorCode_InvalidRequest = 6,
-  ErrorCode_ServerError = 7,
-  ErrorCode_MIN = ErrorCode_Success,
-  ErrorCode_MAX = ErrorCode_ServerError
+enum class ErrorCode : uint8_t {
+  Success = 0,
+  Login_Fail_UserNotFound = 1,
+  Login_Fail_InvalidPassword = 2,
+  SignUp_Fail_UsernameExists = 3,
+  SignUp_Fail_NicknameExists = 4,
+  Auth_Fail_InvalidToken = 5,
+  InvalidRequest = 6,
+  ServerError = 7,
+  MIN = Success,
+  MAX = ServerError
 };
 
 inline const ErrorCode (&EnumValuesErrorCode())[8] {
   static const ErrorCode values[] = {
-    ErrorCode_Success,
-    ErrorCode_Login_Fail_UserNotFound,
-    ErrorCode_Login_Fail_InvalidPassword,
-    ErrorCode_SignUp_Fail_UsernameExists,
-    ErrorCode_SignUp_Fail_NicknameExists,
-    ErrorCode_Auth_Fail_InvalidToken,
-    ErrorCode_InvalidRequest,
-    ErrorCode_ServerError
+    ErrorCode::Success,
+    ErrorCode::Login_Fail_UserNotFound,
+    ErrorCode::Login_Fail_InvalidPassword,
+    ErrorCode::SignUp_Fail_UsernameExists,
+    ErrorCode::SignUp_Fail_NicknameExists,
+    ErrorCode::Auth_Fail_InvalidToken,
+    ErrorCode::InvalidRequest,
+    ErrorCode::ServerError
   };
   return values;
 }
@@ -157,50 +196,101 @@ inline const char * const *EnumNamesErrorCode() {
 }
 
 inline const char *EnumNameErrorCode(ErrorCode e) {
-  if (::flatbuffers::IsOutRange(e, ErrorCode_Success, ErrorCode_ServerError)) return "";
+  if (::flatbuffers::IsOutRange(e, ErrorCode::Success, ErrorCode::ServerError)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesErrorCode()[index];
 }
 
-enum Payload : uint8_t {
-  Payload_NONE = 0,
-  Payload_C2S_KeepAlive = 1,
-  Payload_C2S_LoginRequest = 2,
-  Payload_C2S_SignUpRequest = 3,
-  Payload_C2S_MatchmakingRequest = 4,
-  Payload_S2C_KeepAlive = 5,
-  Payload_S2C_LoginResponse = 6,
-  Payload_S2C_SignUpResponse = 7,
-  Payload_S2C_MatchmakingResponse = 8,
-  Payload_MIN = Payload_NONE,
-  Payload_MAX = Payload_S2C_MatchmakingResponse
+enum class PlayerState : uint8_t {
+  Lobby = 0,
+  Ready = 1,
+  InGame = 2,
+  MIN = Lobby,
+  MAX = InGame
 };
 
-inline const Payload (&EnumValuesPayload())[9] {
+inline const PlayerState (&EnumValuesPlayerState())[3] {
+  static const PlayerState values[] = {
+    PlayerState::Lobby,
+    PlayerState::Ready,
+    PlayerState::InGame
+  };
+  return values;
+}
+
+inline const char * const *EnumNamesPlayerState() {
+  static const char * const names[4] = {
+    "Lobby",
+    "Ready",
+    "InGame",
+    nullptr
+  };
+  return names;
+}
+
+inline const char *EnumNamePlayerState(PlayerState e) {
+  if (::flatbuffers::IsOutRange(e, PlayerState::Lobby, PlayerState::InGame)) return "";
+  const size_t index = static_cast<size_t>(e);
+  return EnumNamesPlayerState()[index];
+}
+
+enum class Payload : uint8_t {
+  NONE = 0,
+  C2S_KeepAlive = 1,
+  C2S_LoginRequest = 2,
+  C2S_SignUpRequest = 3,
+  C2S_PlayerListRequest = 4,
+  C2S_GameReadyRequest = 5,
+  C2S_MatchmakingRequest = 6,
+  S2C_KeepAlive = 7,
+  S2C_LoginResponse = 8,
+  S2C_SignUpResponse = 9,
+  S2C_PlayerListResponse = 10,
+  S2C_GameReady = 11,
+  S2C_PlayerInOutLobby = 12,
+  S2C_StartGame = 13,
+  S2C_MatchmakingResponse = 14,
+  MIN = NONE,
+  MAX = S2C_MatchmakingResponse
+};
+
+inline const Payload (&EnumValuesPayload())[15] {
   static const Payload values[] = {
-    Payload_NONE,
-    Payload_C2S_KeepAlive,
-    Payload_C2S_LoginRequest,
-    Payload_C2S_SignUpRequest,
-    Payload_C2S_MatchmakingRequest,
-    Payload_S2C_KeepAlive,
-    Payload_S2C_LoginResponse,
-    Payload_S2C_SignUpResponse,
-    Payload_S2C_MatchmakingResponse
+    Payload::NONE,
+    Payload::C2S_KeepAlive,
+    Payload::C2S_LoginRequest,
+    Payload::C2S_SignUpRequest,
+    Payload::C2S_PlayerListRequest,
+    Payload::C2S_GameReadyRequest,
+    Payload::C2S_MatchmakingRequest,
+    Payload::S2C_KeepAlive,
+    Payload::S2C_LoginResponse,
+    Payload::S2C_SignUpResponse,
+    Payload::S2C_PlayerListResponse,
+    Payload::S2C_GameReady,
+    Payload::S2C_PlayerInOutLobby,
+    Payload::S2C_StartGame,
+    Payload::S2C_MatchmakingResponse
   };
   return values;
 }
 
 inline const char * const *EnumNamesPayload() {
-  static const char * const names[10] = {
+  static const char * const names[16] = {
     "NONE",
     "C2S_KeepAlive",
     "C2S_LoginRequest",
     "C2S_SignUpRequest",
+    "C2S_PlayerListRequest",
+    "C2S_GameReadyRequest",
     "C2S_MatchmakingRequest",
     "S2C_KeepAlive",
     "S2C_LoginResponse",
     "S2C_SignUpResponse",
+    "S2C_PlayerListResponse",
+    "S2C_GameReady",
+    "S2C_PlayerInOutLobby",
+    "S2C_StartGame",
     "S2C_MatchmakingResponse",
     nullptr
   };
@@ -208,49 +298,150 @@ inline const char * const *EnumNamesPayload() {
 }
 
 inline const char *EnumNamePayload(Payload e) {
-  if (::flatbuffers::IsOutRange(e, Payload_NONE, Payload_S2C_MatchmakingResponse)) return "";
+  if (::flatbuffers::IsOutRange(e, Payload::NONE, Payload::S2C_MatchmakingResponse)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesPayload()[index];
 }
 
 template<typename T> struct PayloadTraits {
-  static const Payload enum_value = Payload_NONE;
+  static const Payload enum_value = Payload::NONE;
 };
 
 template<> struct PayloadTraits<LoginProtocol::C2S_KeepAlive> {
-  static const Payload enum_value = Payload_C2S_KeepAlive;
+  static const Payload enum_value = Payload::C2S_KeepAlive;
 };
 
 template<> struct PayloadTraits<LoginProtocol::C2S_LoginRequest> {
-  static const Payload enum_value = Payload_C2S_LoginRequest;
+  static const Payload enum_value = Payload::C2S_LoginRequest;
 };
 
 template<> struct PayloadTraits<LoginProtocol::C2S_SignUpRequest> {
-  static const Payload enum_value = Payload_C2S_SignUpRequest;
+  static const Payload enum_value = Payload::C2S_SignUpRequest;
+};
+
+template<> struct PayloadTraits<LoginProtocol::C2S_PlayerListRequest> {
+  static const Payload enum_value = Payload::C2S_PlayerListRequest;
+};
+
+template<> struct PayloadTraits<LoginProtocol::C2S_GameReadyRequest> {
+  static const Payload enum_value = Payload::C2S_GameReadyRequest;
 };
 
 template<> struct PayloadTraits<LoginProtocol::C2S_MatchmakingRequest> {
-  static const Payload enum_value = Payload_C2S_MatchmakingRequest;
+  static const Payload enum_value = Payload::C2S_MatchmakingRequest;
 };
 
 template<> struct PayloadTraits<LoginProtocol::S2C_KeepAlive> {
-  static const Payload enum_value = Payload_S2C_KeepAlive;
+  static const Payload enum_value = Payload::S2C_KeepAlive;
 };
 
 template<> struct PayloadTraits<LoginProtocol::S2C_LoginResponse> {
-  static const Payload enum_value = Payload_S2C_LoginResponse;
+  static const Payload enum_value = Payload::S2C_LoginResponse;
 };
 
 template<> struct PayloadTraits<LoginProtocol::S2C_SignUpResponse> {
-  static const Payload enum_value = Payload_S2C_SignUpResponse;
+  static const Payload enum_value = Payload::S2C_SignUpResponse;
+};
+
+template<> struct PayloadTraits<LoginProtocol::S2C_PlayerListResponse> {
+  static const Payload enum_value = Payload::S2C_PlayerListResponse;
+};
+
+template<> struct PayloadTraits<LoginProtocol::S2C_GameReady> {
+  static const Payload enum_value = Payload::S2C_GameReady;
+};
+
+template<> struct PayloadTraits<LoginProtocol::S2C_PlayerInOutLobby> {
+  static const Payload enum_value = Payload::S2C_PlayerInOutLobby;
+};
+
+template<> struct PayloadTraits<LoginProtocol::S2C_StartGame> {
+  static const Payload enum_value = Payload::S2C_StartGame;
 };
 
 template<> struct PayloadTraits<LoginProtocol::S2C_MatchmakingResponse> {
-  static const Payload enum_value = Payload_S2C_MatchmakingResponse;
+  static const Payload enum_value = Payload::S2C_MatchmakingResponse;
 };
 
 bool VerifyPayload(::flatbuffers::Verifier &verifier, const void *obj, Payload type);
-bool VerifyPayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types);
+bool VerifyPayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<Payload> *types);
+
+struct Player FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef PlayerBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_USER_ID = 4,
+    VT_NICKNAME = 6,
+    VT_STATE = 8
+  };
+  const ::flatbuffers::String *user_id() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_USER_ID);
+  }
+  const ::flatbuffers::String *nickname() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_NICKNAME);
+  }
+  LoginProtocol::PlayerState state() const {
+    return static_cast<LoginProtocol::PlayerState>(GetField<uint8_t>(VT_STATE, 0));
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_USER_ID) &&
+           verifier.VerifyString(user_id()) &&
+           VerifyOffset(verifier, VT_NICKNAME) &&
+           verifier.VerifyString(nickname()) &&
+           VerifyField<uint8_t>(verifier, VT_STATE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct PlayerBuilder {
+  typedef Player Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
+    fbb_.AddOffset(Player::VT_USER_ID, user_id);
+  }
+  void add_nickname(::flatbuffers::Offset<::flatbuffers::String> nickname) {
+    fbb_.AddOffset(Player::VT_NICKNAME, nickname);
+  }
+  void add_state(LoginProtocol::PlayerState state) {
+    fbb_.AddElement<uint8_t>(Player::VT_STATE, static_cast<uint8_t>(state), 0);
+  }
+  explicit PlayerBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<Player> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<Player>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<Player> CreatePlayer(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
+    ::flatbuffers::Offset<::flatbuffers::String> nickname = 0,
+    LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
+  PlayerBuilder builder_(_fbb);
+  builder_.add_nickname(nickname);
+  builder_.add_user_id(user_id);
+  builder_.add_state(state);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<Player> CreatePlayerDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *user_id = nullptr,
+    const char *nickname = nullptr,
+    LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
+  auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
+  auto nickname__ = nickname ? _fbb.CreateString(nickname) : 0;
+  return LoginProtocol::CreatePlayer(
+      _fbb,
+      user_id__,
+      nickname__,
+      state);
+}
 
 struct C2S_KeepAlive FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef C2S_KeepAliveBuilder Builder;
@@ -430,7 +621,7 @@ struct S2C_LoginResponseBuilder {
 
 inline ::flatbuffers::Offset<S2C_LoginResponse> CreateS2C_LoginResponse(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode_Success,
+    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode::Success,
     ::flatbuffers::Offset<::flatbuffers::String> session_token = 0,
     ::flatbuffers::Offset<::flatbuffers::String> nickname = 0) {
   S2C_LoginResponseBuilder builder_(_fbb);
@@ -442,7 +633,7 @@ inline ::flatbuffers::Offset<S2C_LoginResponse> CreateS2C_LoginResponse(
 
 inline ::flatbuffers::Offset<S2C_LoginResponse> CreateS2C_LoginResponseDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode_Success,
+    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode::Success,
     const char *session_token = nullptr,
     const char *nickname = nullptr) {
   auto session_token__ = session_token ? _fbb.CreateString(session_token) : 0;
@@ -571,10 +762,343 @@ struct S2C_SignUpResponseBuilder {
 
 inline ::flatbuffers::Offset<S2C_SignUpResponse> CreateS2C_SignUpResponse(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode_Success) {
+    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode::Success) {
   S2C_SignUpResponseBuilder builder_(_fbb);
   builder_.add_error_code(error_code);
   return builder_.Finish();
+}
+
+struct C2S_PlayerListRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef C2S_PlayerListRequestBuilder Builder;
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           verifier.EndTable();
+  }
+};
+
+struct C2S_PlayerListRequestBuilder {
+  typedef C2S_PlayerListRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  explicit C2S_PlayerListRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<C2S_PlayerListRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<C2S_PlayerListRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<C2S_PlayerListRequest> CreateC2S_PlayerListRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb) {
+  C2S_PlayerListRequestBuilder builder_(_fbb);
+  return builder_.Finish();
+}
+
+struct S2C_PlayerListResponse FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef S2C_PlayerListResponseBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_PLAYERS = 4
+  };
+  const ::flatbuffers::Vector<::flatbuffers::Offset<LoginProtocol::Player>> *players() const {
+    return GetPointer<const ::flatbuffers::Vector<::flatbuffers::Offset<LoginProtocol::Player>> *>(VT_PLAYERS);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_PLAYERS) &&
+           verifier.VerifyVector(players()) &&
+           verifier.VerifyVectorOfTables(players()) &&
+           verifier.EndTable();
+  }
+};
+
+struct S2C_PlayerListResponseBuilder {
+  typedef S2C_PlayerListResponse Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_players(::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<LoginProtocol::Player>>> players) {
+    fbb_.AddOffset(S2C_PlayerListResponse::VT_PLAYERS, players);
+  }
+  explicit S2C_PlayerListResponseBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<S2C_PlayerListResponse> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<S2C_PlayerListResponse>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<S2C_PlayerListResponse> CreateS2C_PlayerListResponse(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::Vector<::flatbuffers::Offset<LoginProtocol::Player>>> players = 0) {
+  S2C_PlayerListResponseBuilder builder_(_fbb);
+  builder_.add_players(players);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<S2C_PlayerListResponse> CreateS2C_PlayerListResponseDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const std::vector<::flatbuffers::Offset<LoginProtocol::Player>> *players = nullptr) {
+  auto players__ = players ? _fbb.CreateVector<::flatbuffers::Offset<LoginProtocol::Player>>(*players) : 0;
+  return LoginProtocol::CreateS2C_PlayerListResponse(
+      _fbb,
+      players__);
+}
+
+struct S2C_PlayerInOutLobby FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef S2C_PlayerInOutLobbyBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_USER_ID = 4,
+    VT_IS_JOIN = 6
+  };
+  const ::flatbuffers::String *user_id() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_USER_ID);
+  }
+  bool is_join() const {
+    return GetField<uint8_t>(VT_IS_JOIN, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_USER_ID) &&
+           verifier.VerifyString(user_id()) &&
+           VerifyField<uint8_t>(verifier, VT_IS_JOIN, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct S2C_PlayerInOutLobbyBuilder {
+  typedef S2C_PlayerInOutLobby Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
+    fbb_.AddOffset(S2C_PlayerInOutLobby::VT_USER_ID, user_id);
+  }
+  void add_is_join(bool is_join) {
+    fbb_.AddElement<uint8_t>(S2C_PlayerInOutLobby::VT_IS_JOIN, static_cast<uint8_t>(is_join), 0);
+  }
+  explicit S2C_PlayerInOutLobbyBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<S2C_PlayerInOutLobby> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<S2C_PlayerInOutLobby>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<S2C_PlayerInOutLobby> CreateS2C_PlayerInOutLobby(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
+    bool is_join = false) {
+  S2C_PlayerInOutLobbyBuilder builder_(_fbb);
+  builder_.add_user_id(user_id);
+  builder_.add_is_join(is_join);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<S2C_PlayerInOutLobby> CreateS2C_PlayerInOutLobbyDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *user_id = nullptr,
+    bool is_join = false) {
+  auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
+  return LoginProtocol::CreateS2C_PlayerInOutLobby(
+      _fbb,
+      user_id__,
+      is_join);
+}
+
+struct C2S_GameReadyRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef C2S_GameReadyRequestBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_SESSION_TOKEN = 4,
+    VT_IS_READY = 6
+  };
+  const ::flatbuffers::String *session_token() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_SESSION_TOKEN);
+  }
+  bool is_ready() const {
+    return GetField<uint8_t>(VT_IS_READY, 0) != 0;
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_SESSION_TOKEN) &&
+           verifier.VerifyString(session_token()) &&
+           VerifyField<uint8_t>(verifier, VT_IS_READY, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct C2S_GameReadyRequestBuilder {
+  typedef C2S_GameReadyRequest Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_session_token(::flatbuffers::Offset<::flatbuffers::String> session_token) {
+    fbb_.AddOffset(C2S_GameReadyRequest::VT_SESSION_TOKEN, session_token);
+  }
+  void add_is_ready(bool is_ready) {
+    fbb_.AddElement<uint8_t>(C2S_GameReadyRequest::VT_IS_READY, static_cast<uint8_t>(is_ready), 0);
+  }
+  explicit C2S_GameReadyRequestBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<C2S_GameReadyRequest> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<C2S_GameReadyRequest>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<C2S_GameReadyRequest> CreateC2S_GameReadyRequest(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> session_token = 0,
+    bool is_ready = false) {
+  C2S_GameReadyRequestBuilder builder_(_fbb);
+  builder_.add_session_token(session_token);
+  builder_.add_is_ready(is_ready);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<C2S_GameReadyRequest> CreateC2S_GameReadyRequestDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *session_token = nullptr,
+    bool is_ready = false) {
+  auto session_token__ = session_token ? _fbb.CreateString(session_token) : 0;
+  return LoginProtocol::CreateC2S_GameReadyRequest(
+      _fbb,
+      session_token__,
+      is_ready);
+}
+
+struct S2C_GameReady FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef S2C_GameReadyBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_USER_ID = 4,
+    VT_STATE = 6
+  };
+  const ::flatbuffers::String *user_id() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_USER_ID);
+  }
+  LoginProtocol::PlayerState state() const {
+    return static_cast<LoginProtocol::PlayerState>(GetField<uint8_t>(VT_STATE, 0));
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_USER_ID) &&
+           verifier.VerifyString(user_id()) &&
+           VerifyField<uint8_t>(verifier, VT_STATE, 1) &&
+           verifier.EndTable();
+  }
+};
+
+struct S2C_GameReadyBuilder {
+  typedef S2C_GameReady Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
+    fbb_.AddOffset(S2C_GameReady::VT_USER_ID, user_id);
+  }
+  void add_state(LoginProtocol::PlayerState state) {
+    fbb_.AddElement<uint8_t>(S2C_GameReady::VT_STATE, static_cast<uint8_t>(state), 0);
+  }
+  explicit S2C_GameReadyBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<S2C_GameReady> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<S2C_GameReady>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<S2C_GameReady> CreateS2C_GameReady(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
+    LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
+  S2C_GameReadyBuilder builder_(_fbb);
+  builder_.add_user_id(user_id);
+  builder_.add_state(state);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<S2C_GameReady> CreateS2C_GameReadyDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *user_id = nullptr,
+    LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
+  auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
+  return LoginProtocol::CreateS2C_GameReady(
+      _fbb,
+      user_id__,
+      state);
+}
+
+struct S2C_StartGame FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef S2C_StartGameBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_DEDI_IP_ADDRESS = 4,
+    VT_DEDI_PORT = 6
+  };
+  const ::flatbuffers::String *dedi_ip_address() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_DEDI_IP_ADDRESS);
+  }
+  uint16_t dedi_port() const {
+    return GetField<uint16_t>(VT_DEDI_PORT, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_DEDI_IP_ADDRESS) &&
+           verifier.VerifyString(dedi_ip_address()) &&
+           VerifyField<uint16_t>(verifier, VT_DEDI_PORT, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct S2C_StartGameBuilder {
+  typedef S2C_StartGame Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_dedi_ip_address(::flatbuffers::Offset<::flatbuffers::String> dedi_ip_address) {
+    fbb_.AddOffset(S2C_StartGame::VT_DEDI_IP_ADDRESS, dedi_ip_address);
+  }
+  void add_dedi_port(uint16_t dedi_port) {
+    fbb_.AddElement<uint16_t>(S2C_StartGame::VT_DEDI_PORT, dedi_port, 0);
+  }
+  explicit S2C_StartGameBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<S2C_StartGame> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<S2C_StartGame>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<S2C_StartGame> CreateS2C_StartGame(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    ::flatbuffers::Offset<::flatbuffers::String> dedi_ip_address = 0,
+    uint16_t dedi_port = 0) {
+  S2C_StartGameBuilder builder_(_fbb);
+  builder_.add_dedi_ip_address(dedi_ip_address);
+  builder_.add_dedi_port(dedi_port);
+  return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<S2C_StartGame> CreateS2C_StartGameDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *dedi_ip_address = nullptr,
+    uint16_t dedi_port = 0) {
+  auto dedi_ip_address__ = dedi_ip_address ? _fbb.CreateString(dedi_ip_address) : 0;
+  return LoginProtocol::CreateS2C_StartGame(
+      _fbb,
+      dedi_ip_address__,
+      dedi_port);
 }
 
 struct C2S_MatchmakingRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -681,7 +1205,7 @@ struct S2C_MatchmakingResponseBuilder {
 
 inline ::flatbuffers::Offset<S2C_MatchmakingResponse> CreateS2C_MatchmakingResponse(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode_Success,
+    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode::Success,
     ::flatbuffers::Offset<::flatbuffers::String> ip_address = 0,
     uint16_t port = 0) {
   S2C_MatchmakingResponseBuilder builder_(_fbb);
@@ -693,7 +1217,7 @@ inline ::flatbuffers::Offset<S2C_MatchmakingResponse> CreateS2C_MatchmakingRespo
 
 inline ::flatbuffers::Offset<S2C_MatchmakingResponse> CreateS2C_MatchmakingResponseDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode_Success,
+    LoginProtocol::ErrorCode error_code = LoginProtocol::ErrorCode::Success,
     const char *ip_address = nullptr,
     uint16_t port = 0) {
   auto ip_address__ = ip_address ? _fbb.CreateString(ip_address) : 0;
@@ -722,28 +1246,46 @@ struct MessageEnvelope FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   template<typename T> const T *body_as() const;
   const LoginProtocol::C2S_KeepAlive *body_as_C2S_KeepAlive() const {
-    return body_type() == LoginProtocol::Payload_C2S_KeepAlive ? static_cast<const LoginProtocol::C2S_KeepAlive *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::C2S_KeepAlive ? static_cast<const LoginProtocol::C2S_KeepAlive *>(body()) : nullptr;
   }
   const LoginProtocol::C2S_LoginRequest *body_as_C2S_LoginRequest() const {
-    return body_type() == LoginProtocol::Payload_C2S_LoginRequest ? static_cast<const LoginProtocol::C2S_LoginRequest *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::C2S_LoginRequest ? static_cast<const LoginProtocol::C2S_LoginRequest *>(body()) : nullptr;
   }
   const LoginProtocol::C2S_SignUpRequest *body_as_C2S_SignUpRequest() const {
-    return body_type() == LoginProtocol::Payload_C2S_SignUpRequest ? static_cast<const LoginProtocol::C2S_SignUpRequest *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::C2S_SignUpRequest ? static_cast<const LoginProtocol::C2S_SignUpRequest *>(body()) : nullptr;
+  }
+  const LoginProtocol::C2S_PlayerListRequest *body_as_C2S_PlayerListRequest() const {
+    return body_type() == LoginProtocol::Payload::C2S_PlayerListRequest ? static_cast<const LoginProtocol::C2S_PlayerListRequest *>(body()) : nullptr;
+  }
+  const LoginProtocol::C2S_GameReadyRequest *body_as_C2S_GameReadyRequest() const {
+    return body_type() == LoginProtocol::Payload::C2S_GameReadyRequest ? static_cast<const LoginProtocol::C2S_GameReadyRequest *>(body()) : nullptr;
   }
   const LoginProtocol::C2S_MatchmakingRequest *body_as_C2S_MatchmakingRequest() const {
-    return body_type() == LoginProtocol::Payload_C2S_MatchmakingRequest ? static_cast<const LoginProtocol::C2S_MatchmakingRequest *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::C2S_MatchmakingRequest ? static_cast<const LoginProtocol::C2S_MatchmakingRequest *>(body()) : nullptr;
   }
   const LoginProtocol::S2C_KeepAlive *body_as_S2C_KeepAlive() const {
-    return body_type() == LoginProtocol::Payload_S2C_KeepAlive ? static_cast<const LoginProtocol::S2C_KeepAlive *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::S2C_KeepAlive ? static_cast<const LoginProtocol::S2C_KeepAlive *>(body()) : nullptr;
   }
   const LoginProtocol::S2C_LoginResponse *body_as_S2C_LoginResponse() const {
-    return body_type() == LoginProtocol::Payload_S2C_LoginResponse ? static_cast<const LoginProtocol::S2C_LoginResponse *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::S2C_LoginResponse ? static_cast<const LoginProtocol::S2C_LoginResponse *>(body()) : nullptr;
   }
   const LoginProtocol::S2C_SignUpResponse *body_as_S2C_SignUpResponse() const {
-    return body_type() == LoginProtocol::Payload_S2C_SignUpResponse ? static_cast<const LoginProtocol::S2C_SignUpResponse *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::S2C_SignUpResponse ? static_cast<const LoginProtocol::S2C_SignUpResponse *>(body()) : nullptr;
+  }
+  const LoginProtocol::S2C_PlayerListResponse *body_as_S2C_PlayerListResponse() const {
+    return body_type() == LoginProtocol::Payload::S2C_PlayerListResponse ? static_cast<const LoginProtocol::S2C_PlayerListResponse *>(body()) : nullptr;
+  }
+  const LoginProtocol::S2C_GameReady *body_as_S2C_GameReady() const {
+    return body_type() == LoginProtocol::Payload::S2C_GameReady ? static_cast<const LoginProtocol::S2C_GameReady *>(body()) : nullptr;
+  }
+  const LoginProtocol::S2C_PlayerInOutLobby *body_as_S2C_PlayerInOutLobby() const {
+    return body_type() == LoginProtocol::Payload::S2C_PlayerInOutLobby ? static_cast<const LoginProtocol::S2C_PlayerInOutLobby *>(body()) : nullptr;
+  }
+  const LoginProtocol::S2C_StartGame *body_as_S2C_StartGame() const {
+    return body_type() == LoginProtocol::Payload::S2C_StartGame ? static_cast<const LoginProtocol::S2C_StartGame *>(body()) : nullptr;
   }
   const LoginProtocol::S2C_MatchmakingResponse *body_as_S2C_MatchmakingResponse() const {
-    return body_type() == LoginProtocol::Payload_S2C_MatchmakingResponse ? static_cast<const LoginProtocol::S2C_MatchmakingResponse *>(body()) : nullptr;
+    return body_type() == LoginProtocol::Payload::S2C_MatchmakingResponse ? static_cast<const LoginProtocol::S2C_MatchmakingResponse *>(body()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -767,6 +1309,14 @@ template<> inline const LoginProtocol::C2S_SignUpRequest *MessageEnvelope::body_
   return body_as_C2S_SignUpRequest();
 }
 
+template<> inline const LoginProtocol::C2S_PlayerListRequest *MessageEnvelope::body_as<LoginProtocol::C2S_PlayerListRequest>() const {
+  return body_as_C2S_PlayerListRequest();
+}
+
+template<> inline const LoginProtocol::C2S_GameReadyRequest *MessageEnvelope::body_as<LoginProtocol::C2S_GameReadyRequest>() const {
+  return body_as_C2S_GameReadyRequest();
+}
+
 template<> inline const LoginProtocol::C2S_MatchmakingRequest *MessageEnvelope::body_as<LoginProtocol::C2S_MatchmakingRequest>() const {
   return body_as_C2S_MatchmakingRequest();
 }
@@ -781,6 +1331,22 @@ template<> inline const LoginProtocol::S2C_LoginResponse *MessageEnvelope::body_
 
 template<> inline const LoginProtocol::S2C_SignUpResponse *MessageEnvelope::body_as<LoginProtocol::S2C_SignUpResponse>() const {
   return body_as_S2C_SignUpResponse();
+}
+
+template<> inline const LoginProtocol::S2C_PlayerListResponse *MessageEnvelope::body_as<LoginProtocol::S2C_PlayerListResponse>() const {
+  return body_as_S2C_PlayerListResponse();
+}
+
+template<> inline const LoginProtocol::S2C_GameReady *MessageEnvelope::body_as<LoginProtocol::S2C_GameReady>() const {
+  return body_as_S2C_GameReady();
+}
+
+template<> inline const LoginProtocol::S2C_PlayerInOutLobby *MessageEnvelope::body_as<LoginProtocol::S2C_PlayerInOutLobby>() const {
+  return body_as_S2C_PlayerInOutLobby();
+}
+
+template<> inline const LoginProtocol::S2C_StartGame *MessageEnvelope::body_as<LoginProtocol::S2C_StartGame>() const {
+  return body_as_S2C_StartGame();
 }
 
 template<> inline const LoginProtocol::S2C_MatchmakingResponse *MessageEnvelope::body_as<LoginProtocol::S2C_MatchmakingResponse>() const {
@@ -814,7 +1380,7 @@ struct MessageEnvelopeBuilder {
 inline ::flatbuffers::Offset<MessageEnvelope> CreateMessageEnvelope(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     uint64_t timestamp = 0,
-    LoginProtocol::Payload body_type = LoginProtocol::Payload_NONE,
+    LoginProtocol::Payload body_type = LoginProtocol::Payload::NONE,
     ::flatbuffers::Offset<void> body = 0) {
   MessageEnvelopeBuilder builder_(_fbb);
   builder_.add_timestamp(timestamp);
@@ -825,38 +1391,62 @@ inline ::flatbuffers::Offset<MessageEnvelope> CreateMessageEnvelope(
 
 inline bool VerifyPayload(::flatbuffers::Verifier &verifier, const void *obj, Payload type) {
   switch (type) {
-    case Payload_NONE: {
+    case Payload::NONE: {
       return true;
     }
-    case Payload_C2S_KeepAlive: {
+    case Payload::C2S_KeepAlive: {
       auto ptr = reinterpret_cast<const LoginProtocol::C2S_KeepAlive *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_C2S_LoginRequest: {
+    case Payload::C2S_LoginRequest: {
       auto ptr = reinterpret_cast<const LoginProtocol::C2S_LoginRequest *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_C2S_SignUpRequest: {
+    case Payload::C2S_SignUpRequest: {
       auto ptr = reinterpret_cast<const LoginProtocol::C2S_SignUpRequest *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_C2S_MatchmakingRequest: {
+    case Payload::C2S_PlayerListRequest: {
+      auto ptr = reinterpret_cast<const LoginProtocol::C2S_PlayerListRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::C2S_GameReadyRequest: {
+      auto ptr = reinterpret_cast<const LoginProtocol::C2S_GameReadyRequest *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::C2S_MatchmakingRequest: {
       auto ptr = reinterpret_cast<const LoginProtocol::C2S_MatchmakingRequest *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_S2C_KeepAlive: {
+    case Payload::S2C_KeepAlive: {
       auto ptr = reinterpret_cast<const LoginProtocol::S2C_KeepAlive *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_S2C_LoginResponse: {
+    case Payload::S2C_LoginResponse: {
       auto ptr = reinterpret_cast<const LoginProtocol::S2C_LoginResponse *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_S2C_SignUpResponse: {
+    case Payload::S2C_SignUpResponse: {
       auto ptr = reinterpret_cast<const LoginProtocol::S2C_SignUpResponse *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload_S2C_MatchmakingResponse: {
+    case Payload::S2C_PlayerListResponse: {
+      auto ptr = reinterpret_cast<const LoginProtocol::S2C_PlayerListResponse *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::S2C_GameReady: {
+      auto ptr = reinterpret_cast<const LoginProtocol::S2C_GameReady *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::S2C_PlayerInOutLobby: {
+      auto ptr = reinterpret_cast<const LoginProtocol::S2C_PlayerInOutLobby *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::S2C_StartGame: {
+      auto ptr = reinterpret_cast<const LoginProtocol::S2C_StartGame *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case Payload::S2C_MatchmakingResponse: {
       auto ptr = reinterpret_cast<const LoginProtocol::S2C_MatchmakingResponse *>(obj);
       return verifier.VerifyTable(ptr);
     }
@@ -864,7 +1454,7 @@ inline bool VerifyPayload(::flatbuffers::Verifier &verifier, const void *obj, Pa
   }
 }
 
-inline bool VerifyPayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types) {
+inline bool VerifyPayloadVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<Payload> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
