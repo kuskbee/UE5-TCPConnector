@@ -238,8 +238,6 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	std::string SessionToken = "-";
 	if (ResultStatus == LoginStatus::Success)
 	{
-		std::unique_lock<std::shared_mutex> Lock(SessionMutex);
-
 		SessionToken = util::UuidHelper::GenerateSessionToken();
 		PlayerSession JoinPlayer = PlayerSession{
 			PlayerId, UserId, Nickname, ClientSocket,
@@ -248,9 +246,13 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 
 		BroadcastPlayerJoin(JoinPlayer);
 
-		PlayerSessionMap[SessionToken] = JoinPlayer;
-		TokenByPlayerIdMap[PlayerId] = SessionToken;
-		TokenBySocketMap[ClientSocket] = SessionToken;
+		{
+			std::unique_lock<std::shared_mutex> Lock(SessionMutex);
+
+			PlayerSessionMap[SessionToken] = JoinPlayer;
+			TokenByPlayerIdMap[PlayerId] = SessionToken;
+			TokenBySocketMap[ClientSocket] = SessionToken;
+		}
 	}
 
 	// 응답 FlatBuffer 작성
@@ -276,22 +278,26 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
 {
 	flatbuffers::FlatBufferBuilder Builder;
-
 	std::vector<flatbuffers::Offset<LoginProtocol::Player>> Vec;
-	for (const auto& Player : PlayerSessionMap)
-	{
-		auto UserId = Builder.CreateString(Player.second.UserId);
-		auto Nickname = Builder.CreateString(Player.second.PlayerName);
-		Vec.emplace_back(LoginProtocol::CreatePlayer(
-			Builder,
-			UserId,
-			Nickname,
-			static_cast<LoginProtocol::PlayerState>(Player.second.CurrentState)
-		));
-		std::cout << "[PlayerList] UserId : " << Player.second.UserId;
-		std::cout << ", CurrState : " << (int)Player.second.CurrentState << std::endl;
-	}
 
+	{
+		std::shared_lock <std::shared_mutex> Lock(SessionMutex);
+
+		for (const auto& Player : PlayerSessionMap)
+		{
+			auto UserId = Builder.CreateString(Player.second.UserId);
+			auto Nickname = Builder.CreateString(Player.second.PlayerName);
+			Vec.emplace_back(LoginProtocol::CreatePlayer(
+				Builder,
+				UserId,
+				Nickname,
+				static_cast<LoginProtocol::PlayerState>(Player.second.CurrentState)
+			));
+			std::cout << "[PlayerList] UserId : " << Player.second.UserId;
+			std::cout << ", CurrState : " << (int)Player.second.CurrentState << std::endl;
+		}
+	}
+	
 	auto PlayerVec = Builder.CreateVector(Vec);
 	auto ResList = LoginProtocol::CreateS2C_PlayerListResponse(Builder, PlayerVec);
 
@@ -307,33 +313,47 @@ void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgE
 
 void Server::ProcessGameReadyRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
 {
-	//BroadcastPlayerReady
 	const LoginProtocol::C2S_GameReadyRequest* ReadyReq = MsgEnvelope->body_as_C2S_GameReadyRequest();
 	std::string SessionToken = ReadyReq->session_token()->str();
 	bool bIsReady = ReadyReq->is_ready();
 
-	if (PlayerSessionMap.count(SessionToken) > 0)
 	{
-		PlayerSession& ReadyPlayer = PlayerSessionMap[SessionToken];
-		if (bIsReady)
+		std::shared_lock <std::shared_mutex> Lock(SessionMutex);
+
+		if (PlayerSessionMap.count(SessionToken) > 0)
 		{
-			ReadyPlayer.CurrentState = PlayerState::Ready;
+			PlayerSession& ReadyPlayer = PlayerSessionMap[SessionToken];
+			if (bIsReady)
+			{
+				ReadyPlayer.CurrentState = PlayerState::Ready;
+			}
+			else
+			{
+				ReadyPlayer.CurrentState = PlayerState::Lobby;
+			}
+
+			BroadcastPlayerChangeState(ReadyPlayer);
 		}
 		else
 		{
-			ReadyPlayer.CurrentState = PlayerState::Lobby;
+			std::cout << "<Bad Request> SessionToken[" << SessionToken << "] is Invalid!!" << std::endl;
 		}
-		
-		BroadcastPlayerChangeState(ReadyPlayer);
 	}
-	else
+
+	// 카운트다운 체크
+	if (IsCanStartCountdown())
 	{
-		std::cout << "<Bad Request> SessionToken[" << SessionToken << "] is Invalid!!" << std::endl;
+		StartCountdown();
+	}
+	else if (!bIsReady && bIsCountdownRunning)
+	{
+		StopCountdown();
 	}
 }
 
 void Server::BroadcastPacket(flatbuffers::FlatBufferBuilder& Builder)
 {
+	std::shared_lock <std::shared_mutex> Lock(SessionMutex);
 	for (const auto& Player : PlayerSessionMap)
 	{
 		SendFlatBufferMessage(Player.second.Socket, Builder);
@@ -366,8 +386,6 @@ void Server::BroadcastPlayerJoin(PlayerSession& JoinPlayer)
 
 	BroadcastPacket(Builder);
 }
-
-
 
 void Server::BroadcastPlayerLeave(PlayerSession& LeavePlayer)
 {
@@ -411,6 +429,45 @@ void Server::BroadcastPlayerChangeState(PlayerSession& ChangePlayer)
 		GetTimeStamp(),
 		LoginProtocol::Payload::S2C_PlayerChangeState,
 		ReadyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+
+	BroadcastPacket(Builder);
+}
+
+void Server::BroadcastCountdownStartGame(const bool bIsStart, const int32_t RemainSeconds)
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto CountdownOffset = LoginProtocol::CreateS2C_CountdownStartGame(
+		Builder,
+		bIsStart,
+		RemainSeconds
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_CountdownStartGame,
+		CountdownOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+
+	BroadcastPacket(Builder);
+}
+
+void Server::BroadcastStartGame()
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto DediIp = Builder.CreateString(DediServerIp);
+	auto StartGameOffset = LoginProtocol::CreateS2C_StartGame(
+		Builder,
+		DediIp,
+		DediPort
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_CountdownStartGame,
+		StartGameOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
 
@@ -517,15 +574,18 @@ void Server::CleanUpClientSession(SOCKET ClientSocket)
 		SessionToken = it->second;
 	}
 
-	std::unique_lock<std::shared_mutex> Lock(SessionMutex);
+	PlayerSession LeavePlayer;
+	{
+		std::unique_lock<std::shared_mutex> Lock(SessionMutex);
 
-	PlayerSession LeavePlayer = PlayerSessionMap[SessionToken];
-	int32_t PlayerId = LeavePlayer.DbId;
+		LeavePlayer = PlayerSessionMap[SessionToken];
+		int32_t PlayerId = LeavePlayer.DbId;
 
-	// 3개 맵에서 모두 삭제
-	TokenBySocketMap.erase(ClientSocket);
-	TokenByPlayerIdMap.erase(PlayerId);
-	PlayerSessionMap.erase(SessionToken);
+		// 3개 맵에서 모두 삭제
+		TokenBySocketMap.erase(ClientSocket);
+		TokenByPlayerIdMap.erase(PlayerId);
+		PlayerSessionMap.erase(SessionToken);
+	}
 
 	// 다른 클라이언트들에게 나간다고 브로드캐스트
 	BroadcastPlayerLeave(LeavePlayer);
@@ -535,12 +595,20 @@ void Server::CleanUpClientSession(SOCKET ClientSocket)
 
 bool Server::IsCanStartCountdown()
 {
+	bool expected = false;
 	if (bIsCountdownRunning)
 	{
 		return false;
 	}
 
+	std::shared_lock <std::shared_mutex> Lock(SessionMutex);
+
 	size_t PlayerCnt = PlayerSessionMap.size();
+	if (PlayerCnt < 2)
+	{
+		return false;
+	}
+
 	size_t ReadyPlayer = 0;
 	for (const auto& Player : PlayerSessionMap)
 	{
@@ -555,10 +623,46 @@ bool Server::IsCanStartCountdown()
 
 void Server::StartCountdown()
 {
+	if (bIsCountdownRunning)
+	{
+		return;
+	}
 
+	bIsCountdownRunning = true;
+
+	CountdownThread = std::make_shared<std::thread>([this]()
+	{
+		int32_t Remaining = CountdownSeconds;
+		while (Remaining > 0 && bIsCountdownRunning)
+		{
+			BroadcastCountdownStartGame(true, Remaining);
+			std::this_thread::sleep_for(std::chrono::seconds(1));
+			--Remaining;
+		}
+
+		if (bIsCountdownRunning)                // 정상 종료
+		{
+			BroadcastStartGame();
+		}
+		bIsCountdownRunning = false;            // 플래그 리셋
+	});
 }
 
 void Server::StopCountdown()
 {
+	bool bBroadcastStop = false;
+	if (bIsCountdownRunning)
+	{
+		bBroadcastStop = true;
+	}
 
+	bIsCountdownRunning = false;
+	if (CountdownThread && CountdownThread->joinable())
+		CountdownThread->join();
+	CountdownThread.reset();
+
+	if (bBroadcastStop)
+	{
+		BroadcastCountdownStartGame(false, 0);
+	}
 }

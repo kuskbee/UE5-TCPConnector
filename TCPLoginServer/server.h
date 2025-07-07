@@ -38,6 +38,8 @@ private:
 	void BroadcastPlayerJoin(PlayerSession& JoinPlayer);
 	void BroadcastPlayerLeave(PlayerSession& LeavePlayer);
 	void BroadcastPlayerChangeState(PlayerSession& ChangePlayer);
+	void BroadcastCountdownStartGame(const bool bIsStart, const int32_t RemainSeconds);
+	void BroadcastStartGame();
 
 	bool RecvAll(SOCKET sock, char* buf, size_t len);
 	bool SendAll(SOCKET sock, char* buf, size_t len);
@@ -68,5 +70,8 @@ private:
 	std::atomic<bool> bIsCountdownRunning = false; // 10초 카운트다운 진행 여부
 	std::shared_ptr<std::thread> CountdownThread;
 
-	int32_t CountdownSeconds = 10;
+	const int32_t CountdownSeconds = 10;
+
+	std::string DediServerIp = "127.0.0.1";
+	unsigned short DediPort = 7777;
 };
