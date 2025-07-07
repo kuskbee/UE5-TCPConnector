@@ -34,9 +34,10 @@ private:
 	void ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 	void ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 	void ProcessGameReadyRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
+	void BroadcastPacket(flatbuffers::FlatBufferBuilder& Builder);
 	void BroadcastPlayerJoin(PlayerSession& JoinPlayer);
 	void BroadcastPlayerLeave(PlayerSession& LeavePlayer);
-	void BroadcastPlayerReady(PlayerSession& ReadyPlayer);
+	void BroadcastPlayerChangeState(PlayerSession& ChangePlayer);
 
 	bool RecvAll(SOCKET sock, char* buf, size_t len);
 	bool SendAll(SOCKET sock, char* buf, size_t len);
@@ -44,6 +45,11 @@ private:
 	bool ReceiveFlatBufferMessage(SOCKET Sock, std::vector<char>& RecvBuf, uint32_t& outMessageSize);
 
 	void CleanUpClientSession(SOCKET ClientSocket);
+
+	// Game-logic
+	bool IsCanStartCountdown();
+	void StartCountdown();
+	void StopCountdown();
 
 	SOCKET ListenSocket{ INVALID_SOCKET };
 	DatabaseManager DbManager;

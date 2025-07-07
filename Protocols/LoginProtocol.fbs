@@ -19,7 +19,7 @@ enum S2C_Message : ushort
 	S2C_SignUpResponse,
 	S2C_PlayerListResponse,
 	S2C_PlayerInOutLobby,
-	S2C_GameReady,
+	S2C_PlayerChangeState,
 	S2C_CountdownStartGame,
 	S2C_StartGame,
 	S2C_MatchmakingResponse
@@ -107,8 +107,8 @@ table C2S_GameReadyRequest
 	session_token: string;
 	is_ready : bool;
 }
-
-table S2C_GameReady
+//------------------------------------
+table S2C_PlayerChangeState
 {
 	user_id: string;
 	state : PlayerState;
@@ -116,6 +116,7 @@ table S2C_GameReady
 //------------------------------------
 table S2C_CountdownStartGame
 {
+	is_start: bool;
 	countdown: uint32;
 }
 //------------------------------------
@@ -154,7 +155,7 @@ union Payload
 	S2C_LoginResponse,
 	S2C_SignUpResponse,
 	S2C_PlayerListResponse,
-	S2C_GameReady,
+	S2C_PlayerChangeState,
 	S2C_PlayerInOutLobby,
 	S2C_CountdownStartGame,
 	S2C_StartGame,

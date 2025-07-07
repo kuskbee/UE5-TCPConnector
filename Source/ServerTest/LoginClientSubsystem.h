@@ -57,7 +57,7 @@ private:
 	void ProcessSignUpResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessPlayerListResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessPlayerInOutLobby(const LoginProtocol::MessageEnvelope* MsgEnvelope);
-	void ProcessPlayerGameReady(const LoginProtocol::MessageEnvelope* MsgEnvelope);
+	void ProcessPlayerChangeState(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 
 	TObjectPtr<FSocket> Socket;
 	FTimerHandle NetworkTimerHandle;
@@ -77,5 +77,5 @@ public:
 	FOnPlayerInOutLobby OnPlayerInOutLobbyDelegate;
 
 	UPROPERTY(BlueprintAssignable)
-	FOnPlayerGameReady OnPlayerGameReadyDelegate;
+	FOnPlayerGameReady OnPlayerChangeStateDelegate;
 };

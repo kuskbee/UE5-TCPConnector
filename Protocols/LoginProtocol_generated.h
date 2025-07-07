@@ -48,8 +48,8 @@ struct S2C_PlayerInOutLobbyBuilder;
 struct C2S_GameReadyRequest;
 struct C2S_GameReadyRequestBuilder;
 
-struct S2C_GameReady;
-struct S2C_GameReadyBuilder;
+struct S2C_PlayerChangeState;
+struct S2C_PlayerChangeStateBuilder;
 
 struct S2C_CountdownStartGame;
 struct S2C_CountdownStartGameBuilder;
@@ -114,7 +114,7 @@ enum class S2C_Message : uint16_t {
   S2C_SignUpResponse = 2,
   S2C_PlayerListResponse = 3,
   S2C_PlayerInOutLobby = 4,
-  S2C_GameReady = 5,
+  S2C_PlayerChangeState = 5,
   S2C_CountdownStartGame = 6,
   S2C_StartGame = 7,
   S2C_MatchmakingResponse = 8,
@@ -129,7 +129,7 @@ inline const S2C_Message (&EnumValuesS2C_Message())[9] {
     S2C_Message::S2C_SignUpResponse,
     S2C_Message::S2C_PlayerListResponse,
     S2C_Message::S2C_PlayerInOutLobby,
-    S2C_Message::S2C_GameReady,
+    S2C_Message::S2C_PlayerChangeState,
     S2C_Message::S2C_CountdownStartGame,
     S2C_Message::S2C_StartGame,
     S2C_Message::S2C_MatchmakingResponse
@@ -144,7 +144,7 @@ inline const char * const *EnumNamesS2C_Message() {
     "S2C_SignUpResponse",
     "S2C_PlayerListResponse",
     "S2C_PlayerInOutLobby",
-    "S2C_GameReady",
+    "S2C_PlayerChangeState",
     "S2C_CountdownStartGame",
     "S2C_StartGame",
     "S2C_MatchmakingResponse",
@@ -252,7 +252,7 @@ enum class Payload : uint8_t {
   S2C_LoginResponse = 8,
   S2C_SignUpResponse = 9,
   S2C_PlayerListResponse = 10,
-  S2C_GameReady = 11,
+  S2C_PlayerChangeState = 11,
   S2C_PlayerInOutLobby = 12,
   S2C_CountdownStartGame = 13,
   S2C_StartGame = 14,
@@ -274,7 +274,7 @@ inline const Payload (&EnumValuesPayload())[16] {
     Payload::S2C_LoginResponse,
     Payload::S2C_SignUpResponse,
     Payload::S2C_PlayerListResponse,
-    Payload::S2C_GameReady,
+    Payload::S2C_PlayerChangeState,
     Payload::S2C_PlayerInOutLobby,
     Payload::S2C_CountdownStartGame,
     Payload::S2C_StartGame,
@@ -296,7 +296,7 @@ inline const char * const *EnumNamesPayload() {
     "S2C_LoginResponse",
     "S2C_SignUpResponse",
     "S2C_PlayerListResponse",
-    "S2C_GameReady",
+    "S2C_PlayerChangeState",
     "S2C_PlayerInOutLobby",
     "S2C_CountdownStartGame",
     "S2C_StartGame",
@@ -356,8 +356,8 @@ template<> struct PayloadTraits<LoginProtocol::S2C_PlayerListResponse> {
   static const Payload enum_value = Payload::S2C_PlayerListResponse;
 };
 
-template<> struct PayloadTraits<LoginProtocol::S2C_GameReady> {
-  static const Payload enum_value = Payload::S2C_GameReady;
+template<> struct PayloadTraits<LoginProtocol::S2C_PlayerChangeState> {
+  static const Payload enum_value = Payload::S2C_PlayerChangeState;
 };
 
 template<> struct PayloadTraits<LoginProtocol::S2C_PlayerInOutLobby> {
@@ -977,8 +977,8 @@ inline ::flatbuffers::Offset<C2S_GameReadyRequest> CreateC2S_GameReadyRequestDir
       is_ready);
 }
 
-struct S2C_GameReady FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
-  typedef S2C_GameReadyBuilder Builder;
+struct S2C_PlayerChangeState FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef S2C_PlayerChangeStateBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_USER_ID = 4,
     VT_STATE = 6
@@ -998,43 +998,43 @@ struct S2C_GameReady FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
 };
 
-struct S2C_GameReadyBuilder {
-  typedef S2C_GameReady Table;
+struct S2C_PlayerChangeStateBuilder {
+  typedef S2C_PlayerChangeState Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
   void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
-    fbb_.AddOffset(S2C_GameReady::VT_USER_ID, user_id);
+    fbb_.AddOffset(S2C_PlayerChangeState::VT_USER_ID, user_id);
   }
   void add_state(LoginProtocol::PlayerState state) {
-    fbb_.AddElement<uint8_t>(S2C_GameReady::VT_STATE, static_cast<uint8_t>(state), 0);
+    fbb_.AddElement<uint8_t>(S2C_PlayerChangeState::VT_STATE, static_cast<uint8_t>(state), 0);
   }
-  explicit S2C_GameReadyBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+  explicit S2C_PlayerChangeStateBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
   }
-  ::flatbuffers::Offset<S2C_GameReady> Finish() {
+  ::flatbuffers::Offset<S2C_PlayerChangeState> Finish() {
     const auto end = fbb_.EndTable(start_);
-    auto o = ::flatbuffers::Offset<S2C_GameReady>(end);
+    auto o = ::flatbuffers::Offset<S2C_PlayerChangeState>(end);
     return o;
   }
 };
 
-inline ::flatbuffers::Offset<S2C_GameReady> CreateS2C_GameReady(
+inline ::flatbuffers::Offset<S2C_PlayerChangeState> CreateS2C_PlayerChangeState(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
     LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
-  S2C_GameReadyBuilder builder_(_fbb);
+  S2C_PlayerChangeStateBuilder builder_(_fbb);
   builder_.add_user_id(user_id);
   builder_.add_state(state);
   return builder_.Finish();
 }
 
-inline ::flatbuffers::Offset<S2C_GameReady> CreateS2C_GameReadyDirect(
+inline ::flatbuffers::Offset<S2C_PlayerChangeState> CreateS2C_PlayerChangeStateDirect(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     const char *user_id = nullptr,
     LoginProtocol::PlayerState state = LoginProtocol::PlayerState::Lobby) {
   auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
-  return LoginProtocol::CreateS2C_GameReady(
+  return LoginProtocol::CreateS2C_PlayerChangeState(
       _fbb,
       user_id__,
       state);
@@ -1043,13 +1043,18 @@ inline ::flatbuffers::Offset<S2C_GameReady> CreateS2C_GameReadyDirect(
 struct S2C_CountdownStartGame FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef S2C_CountdownStartGameBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_COUNTDOWN = 4
+    VT_IS_START = 4,
+    VT_COUNTDOWN = 6
   };
+  bool is_start() const {
+    return GetField<uint8_t>(VT_IS_START, 0) != 0;
+  }
   uint32_t countdown() const {
     return GetField<uint32_t>(VT_COUNTDOWN, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<uint8_t>(verifier, VT_IS_START, 1) &&
            VerifyField<uint32_t>(verifier, VT_COUNTDOWN, 4) &&
            verifier.EndTable();
   }
@@ -1059,6 +1064,9 @@ struct S2C_CountdownStartGameBuilder {
   typedef S2C_CountdownStartGame Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_is_start(bool is_start) {
+    fbb_.AddElement<uint8_t>(S2C_CountdownStartGame::VT_IS_START, static_cast<uint8_t>(is_start), 0);
+  }
   void add_countdown(uint32_t countdown) {
     fbb_.AddElement<uint32_t>(S2C_CountdownStartGame::VT_COUNTDOWN, countdown, 0);
   }
@@ -1075,9 +1083,11 @@ struct S2C_CountdownStartGameBuilder {
 
 inline ::flatbuffers::Offset<S2C_CountdownStartGame> CreateS2C_CountdownStartGame(
     ::flatbuffers::FlatBufferBuilder &_fbb,
+    bool is_start = false,
     uint32_t countdown = 0) {
   S2C_CountdownStartGameBuilder builder_(_fbb);
   builder_.add_countdown(countdown);
+  builder_.add_is_start(is_start);
   return builder_.Finish();
 }
 
@@ -1318,8 +1328,8 @@ struct MessageEnvelope FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const LoginProtocol::S2C_PlayerListResponse *body_as_S2C_PlayerListResponse() const {
     return body_type() == LoginProtocol::Payload::S2C_PlayerListResponse ? static_cast<const LoginProtocol::S2C_PlayerListResponse *>(body()) : nullptr;
   }
-  const LoginProtocol::S2C_GameReady *body_as_S2C_GameReady() const {
-    return body_type() == LoginProtocol::Payload::S2C_GameReady ? static_cast<const LoginProtocol::S2C_GameReady *>(body()) : nullptr;
+  const LoginProtocol::S2C_PlayerChangeState *body_as_S2C_PlayerChangeState() const {
+    return body_type() == LoginProtocol::Payload::S2C_PlayerChangeState ? static_cast<const LoginProtocol::S2C_PlayerChangeState *>(body()) : nullptr;
   }
   const LoginProtocol::S2C_PlayerInOutLobby *body_as_S2C_PlayerInOutLobby() const {
     return body_type() == LoginProtocol::Payload::S2C_PlayerInOutLobby ? static_cast<const LoginProtocol::S2C_PlayerInOutLobby *>(body()) : nullptr;
@@ -1383,8 +1393,8 @@ template<> inline const LoginProtocol::S2C_PlayerListResponse *MessageEnvelope::
   return body_as_S2C_PlayerListResponse();
 }
 
-template<> inline const LoginProtocol::S2C_GameReady *MessageEnvelope::body_as<LoginProtocol::S2C_GameReady>() const {
-  return body_as_S2C_GameReady();
+template<> inline const LoginProtocol::S2C_PlayerChangeState *MessageEnvelope::body_as<LoginProtocol::S2C_PlayerChangeState>() const {
+  return body_as_S2C_PlayerChangeState();
 }
 
 template<> inline const LoginProtocol::S2C_PlayerInOutLobby *MessageEnvelope::body_as<LoginProtocol::S2C_PlayerInOutLobby>() const {
@@ -1484,8 +1494,8 @@ inline bool VerifyPayload(::flatbuffers::Verifier &verifier, const void *obj, Pa
       auto ptr = reinterpret_cast<const LoginProtocol::S2C_PlayerListResponse *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case Payload::S2C_GameReady: {
-      auto ptr = reinterpret_cast<const LoginProtocol::S2C_GameReady *>(obj);
+    case Payload::S2C_PlayerChangeState: {
+      auto ptr = reinterpret_cast<const LoginProtocol::S2C_PlayerChangeState *>(obj);
       return verifier.VerifyTable(ptr);
     }
     case Payload::S2C_PlayerInOutLobby: {

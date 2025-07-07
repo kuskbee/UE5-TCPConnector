@@ -212,9 +212,9 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 		ProcessPlayerInOutLobby(MsgEnvelope);
 		break;
 	}
-	case LoginProtocol::Payload::S2C_GameReady:
+	case LoginProtocol::Payload::S2C_PlayerChangeState:
 	{
-		ProcessPlayerGameReady(MsgEnvelope);
+		ProcessPlayerChangeState(MsgEnvelope);
 		break;
 	}
 	default:
@@ -294,16 +294,16 @@ void ULoginClientSubsystem::ProcessPlayerInOutLobby(const LoginProtocol::Message
 	OnPlayerInOutLobbyDelegate.Broadcast(FPlayerInfo(UserId, Nickname, PlyState), bIsJoin);
 }
 
-void ULoginClientSubsystem::ProcessPlayerGameReady(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+void ULoginClientSubsystem::ProcessPlayerChangeState(const LoginProtocol::MessageEnvelope* MsgEnvelope)
 {
-	const LoginProtocol::S2C_GameReady* PlayerReadyRes = MsgEnvelope->body_as_S2C_GameReady();
+	const LoginProtocol::S2C_PlayerChangeState* ChangeStateRes = MsgEnvelope->body_as_S2C_PlayerChangeState();
 
-	const char* Utf8UserId = PlayerReadyRes->user_id()->c_str();
+	const char* Utf8UserId = ChangeStateRes->user_id()->c_str();
 	const FString UserId = FString(UTF8_TO_TCHAR(Utf8UserId));
 
-	EPlayerState PlyState = static_cast<EPlayerState>(PlayerReadyRes->state());
+	EPlayerState PlyState = static_cast<EPlayerState>(ChangeStateRes->state());
 
-	OnPlayerGameReadyDelegate.Broadcast(UserId, PlyState);
+	OnPlayerChangeStateDelegate.Broadcast(UserId, PlyState);
 }
 
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)
