@@ -16,6 +16,6 @@ struct PlayerSession
     int32_t DbId;                 // DB의 유저 ID
     std::string UserId;           // 유저 ID
     std::string PlayerName;       // 플레이어 닉네임
-    SOCKET* Socket;              // 해당 클라이언트의 소켓 정보
+    SOCKET Socket;              // 해당 클라이언트의 소켓 정보
     PlayerState CurrentState;    // 현재 플레이어 상태 (Lobby, Ready 등)
 };

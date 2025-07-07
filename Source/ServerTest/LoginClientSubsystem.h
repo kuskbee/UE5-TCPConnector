@@ -13,6 +13,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLoginResponse, ELoginServerErrorCode, ErrCode, FString, Nickname, FString, SessionToken);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSignUpResponse, ELoginServerErrorCode, ErrCode);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerListResponse, const TArray<FPlayerInfo>&, PlayerInfos);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerInOutLobby, FPlayerInfo, PlayerInfo, bool, bIsJoin);
 
 UCLASS()
 class SERVERTEST_API ULoginClientSubsystem : public UGameInstanceSubsystem
@@ -51,6 +52,7 @@ private:
 	void ProcessLoginResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessSignUpResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessPlayerListResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
+	void ProcessPlayerInOutLobby(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 
 	TObjectPtr<FSocket> Socket;
 	FTimerHandle NetworkTimerHandle;
@@ -65,4 +67,7 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnPlayerListResponse OnPlayerListResponseDelegate;
+	
+	UPROPERTY(BlueprintAssignable)
+	FOnPlayerInOutLobby OnPlayerInOutLobbyDelegate;
 };

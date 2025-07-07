@@ -33,6 +33,8 @@ private:
 	void ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 	void ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
 	void ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket);
+	void BroadcastPlayerJoin(PlayerSession& JoinPlayer);
+	void BroadcastPlayerLeave(PlayerSession& LeavePlayer);
 
 	bool RecvAll(SOCKET sock, char* buf, size_t len);
 	bool SendAll(SOCKET sock, char* buf, size_t len);

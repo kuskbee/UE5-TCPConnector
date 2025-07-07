@@ -207,6 +207,11 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 		ProcessPlayerListResponse(MsgEnvelope);
 		break;
 	}
+	case LoginProtocol::Payload::S2C_PlayerInOutLobby:
+	{
+		ProcessPlayerInOutLobby(MsgEnvelope);
+		break;
+	}
 	default:
 		UE_LOG(LogTemp, Error, TEXT("Unknown payload type [%d]"), static_cast<uint8_t>(MsgEnvelope->body_type()));
 		break;
@@ -263,6 +268,25 @@ void ULoginClientSubsystem::ProcessPlayerListResponse(const LoginProtocol::Messa
 	UE_LOG(LogTemp, Warning, TEXT("[PlayerList] Received Player List, Num : %d"), PlayerInfos.Num());
 
 	OnPlayerListResponseDelegate.Broadcast(PlayerInfos);
+}
+
+void ULoginClientSubsystem::ProcessPlayerInOutLobby(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+{
+	const LoginProtocol::S2C_PlayerInOutLobby* PlayerInOutRes = MsgEnvelope->body_as_S2C_PlayerInOutLobby();
+
+	const char* Utf8UserId = PlayerInOutRes->player()->user_id()->c_str();
+	const FString UserId = FString(UTF8_TO_TCHAR(Utf8UserId));
+
+	const char* Utf8Nickname = PlayerInOutRes->player()->nickname()->c_str();
+	const FString Nickname = FString(UTF8_TO_TCHAR(Utf8Nickname));
+
+	EPlayerState PlyState = static_cast<EPlayerState>(PlayerInOutRes->player()->state());
+
+	bool bIsJoin = PlayerInOutRes->is_join();
+
+	UE_LOG(LogTemp, Warning, TEXT("[ProcessPlayerInOutLobby] %s IsJoin [%d]"), *Nickname, bIsJoin);
+
+	OnPlayerInOutLobbyDelegate.Broadcast(FPlayerInfo(UserId, Nickname, PlyState), bIsJoin);
 }
 
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)

@@ -852,19 +852,19 @@ inline ::flatbuffers::Offset<S2C_PlayerListResponse> CreateS2C_PlayerListRespons
 struct S2C_PlayerInOutLobby FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef S2C_PlayerInOutLobbyBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_USER_ID = 4,
+    VT_PLAYER = 4,
     VT_IS_JOIN = 6
   };
-  const ::flatbuffers::String *user_id() const {
-    return GetPointer<const ::flatbuffers::String *>(VT_USER_ID);
+  const LoginProtocol::Player *player() const {
+    return GetPointer<const LoginProtocol::Player *>(VT_PLAYER);
   }
   bool is_join() const {
     return GetField<uint8_t>(VT_IS_JOIN, 0) != 0;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_USER_ID) &&
-           verifier.VerifyString(user_id()) &&
+           VerifyOffset(verifier, VT_PLAYER) &&
+           verifier.VerifyTable(player()) &&
            VerifyField<uint8_t>(verifier, VT_IS_JOIN, 1) &&
            verifier.EndTable();
   }
@@ -874,8 +874,8 @@ struct S2C_PlayerInOutLobbyBuilder {
   typedef S2C_PlayerInOutLobby Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_user_id(::flatbuffers::Offset<::flatbuffers::String> user_id) {
-    fbb_.AddOffset(S2C_PlayerInOutLobby::VT_USER_ID, user_id);
+  void add_player(::flatbuffers::Offset<LoginProtocol::Player> player) {
+    fbb_.AddOffset(S2C_PlayerInOutLobby::VT_PLAYER, player);
   }
   void add_is_join(bool is_join) {
     fbb_.AddElement<uint8_t>(S2C_PlayerInOutLobby::VT_IS_JOIN, static_cast<uint8_t>(is_join), 0);
@@ -893,23 +893,12 @@ struct S2C_PlayerInOutLobbyBuilder {
 
 inline ::flatbuffers::Offset<S2C_PlayerInOutLobby> CreateS2C_PlayerInOutLobby(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    ::flatbuffers::Offset<::flatbuffers::String> user_id = 0,
+    ::flatbuffers::Offset<LoginProtocol::Player> player = 0,
     bool is_join = false) {
   S2C_PlayerInOutLobbyBuilder builder_(_fbb);
-  builder_.add_user_id(user_id);
+  builder_.add_player(player);
   builder_.add_is_join(is_join);
   return builder_.Finish();
-}
-
-inline ::flatbuffers::Offset<S2C_PlayerInOutLobby> CreateS2C_PlayerInOutLobbyDirect(
-    ::flatbuffers::FlatBufferBuilder &_fbb,
-    const char *user_id = nullptr,
-    bool is_join = false) {
-  auto user_id__ = user_id ? _fbb.CreateString(user_id) : 0;
-  return LoginProtocol::CreateS2C_PlayerInOutLobby(
-      _fbb,
-      user_id__,
-      is_join);
 }
 
 struct C2S_GameReadyRequest FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {

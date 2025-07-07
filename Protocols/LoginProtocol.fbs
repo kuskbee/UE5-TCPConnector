@@ -97,7 +97,7 @@ table S2C_PlayerListResponse
 //------------------------------------
 table S2C_PlayerInOutLobby
 {
-	user_id: string;
+	player : Player;
 	is_join: bool;
 }
 //------------------------------------

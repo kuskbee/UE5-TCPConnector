@@ -236,11 +236,14 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 		std::unique_lock<std::shared_mutex> Lock(SessionMutex);
 
 		SessionToken = util::UuidHelper::GenerateSessionToken();
-		
-		PlayerSessionMap[SessionToken] = PlayerSession{
-			PlayerId, UserId, Nickname, &ClientSocket,
+		PlayerSession JoinPlayer = PlayerSession{
+			PlayerId, UserId, Nickname, ClientSocket,
 			PlayerState::Lobby
 		};
+
+		BroadcastPlayerJoin(JoinPlayer);
+
+		PlayerSessionMap[SessionToken] = JoinPlayer;
 		TokenByPlayerIdMap[PlayerId] = SessionToken;
 		TokenBySocketMap[ClientSocket] = SessionToken;
 	}
@@ -296,6 +299,71 @@ void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgE
 	);
 	Builder.Finish(SendMsgData);
 	SendFlatBufferMessage(ClientSocket, Builder);
+}
+
+void Server::BroadcastPlayerJoin(PlayerSession& JoinPlayer)
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto UserId = Builder.CreateString(JoinPlayer.UserId);
+	auto Nickname = Builder.CreateString(JoinPlayer.PlayerName);
+	auto PlayerOffset = LoginProtocol::CreatePlayer(
+		Builder,
+		UserId,
+		Nickname,
+		static_cast<LoginProtocol::PlayerState>(JoinPlayer.CurrentState)
+	);
+	auto InOutOffset = LoginProtocol::CreateS2C_PlayerInOutLobby(
+		Builder,
+		PlayerOffset,
+		true
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_PlayerInOutLobby,
+		InOutOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+
+	for (const auto& Player : PlayerSessionMap)
+	{	
+		std::cout << "[BroadcastPlayerJoin] User[" << JoinPlayer.UserId << "] Join";
+		std::cout << "-> Broadcast UserId[" << Player.second.UserId << "]" << std::endl;
+
+		bool bSend = SendFlatBufferMessage(Player.second.Socket, Builder);
+		if (!bSend)
+		{
+			std::cout << "[BroadcastPlayerJoin] Send Failed User[" << JoinPlayer.UserId << "]";
+			std::cout << " Socket[" << Player.second.Socket << "]" << std::endl;
+		}
+	}
+}
+
+void Server::BroadcastPlayerLeave(PlayerSession& LeavePlayer)
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto UserId = Builder.CreateString(LeavePlayer.UserId);
+	auto Nickname = Builder.CreateString(LeavePlayer.PlayerName);
+	auto PlayerOffset = LoginProtocol::CreatePlayer(
+		Builder,
+		UserId,
+		Nickname,
+		static_cast<LoginProtocol::PlayerState>(LeavePlayer.CurrentState)
+	);
+	auto SendMsgData = LoginProtocol::CreateS2C_PlayerInOutLobby(
+		Builder,
+		PlayerOffset,
+		false
+	);
+	Builder.Finish(SendMsgData);
+
+	for (const auto& Player : PlayerSessionMap)
+	{
+		std::cout << "[BroadcastPlayerLeave] User[" << LeavePlayer.UserId << "] Leave";
+		std::cout << "-> Broadcast UserId[" << Player.second.UserId << "]" << std::endl;
+
+		SendFlatBufferMessage(Player.second.Socket, Builder);
+	}
 }
 
 bool Server::RecvAll(SOCKET Sock, char* RecvBuff, size_t RecvLen)
@@ -400,13 +468,16 @@ void Server::CleanUpClientSession(SOCKET ClientSocket)
 
 	std::unique_lock<std::shared_mutex> Lock(SessionMutex);
 
-	int32_t PlayerId = PlayerSessionMap[SessionToken].DbId;
+	PlayerSession LeavePlayer = PlayerSessionMap[SessionToken];
+	int32_t PlayerId = LeavePlayer.DbId;
 
 	// 3개 맵에서 모두 삭제
 	TokenBySocketMap.erase(ClientSocket);
 	TokenByPlayerIdMap.erase(PlayerId);
 	PlayerSessionMap.erase(SessionToken);
 
-	// 다른 클라이언트들에게 나갔다고 브로드캐스트
+	// 다른 클라이언트들에게 나간다고 브로드캐스트
+	BroadcastPlayerLeave(LeavePlayer);
 
+	std::cout << "### Client Connection Closed [" << ClientSocket << "]" << std::endl;
 }
