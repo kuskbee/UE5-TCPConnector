@@ -212,6 +212,11 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 		ProcessPlayerInOutLobby(MsgEnvelope);
 		break;
 	}
+	case LoginProtocol::Payload::S2C_GameReady:
+	{
+		ProcessPlayerGameReady(MsgEnvelope);
+		break;
+	}
 	default:
 		UE_LOG(LogTemp, Error, TEXT("Unknown payload type [%d]"), static_cast<uint8_t>(MsgEnvelope->body_type()));
 		break;
@@ -289,6 +294,18 @@ void ULoginClientSubsystem::ProcessPlayerInOutLobby(const LoginProtocol::Message
 	OnPlayerInOutLobbyDelegate.Broadcast(FPlayerInfo(UserId, Nickname, PlyState), bIsJoin);
 }
 
+void ULoginClientSubsystem::ProcessPlayerGameReady(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+{
+	const LoginProtocol::S2C_GameReady* PlayerReadyRes = MsgEnvelope->body_as_S2C_GameReady();
+
+	const char* Utf8UserId = PlayerReadyRes->user_id()->c_str();
+	const FString UserId = FString(UTF8_TO_TCHAR(Utf8UserId));
+
+	EPlayerState PlyState = static_cast<EPlayerState>(PlayerReadyRes->state());
+
+	OnPlayerGameReadyDelegate.Broadcast(UserId, PlyState);
+}
+
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)
 {
 	std::string UserIdCharBuf = TCHAR_TO_UTF8(*UserId);
@@ -348,6 +365,26 @@ void ULoginClientSubsystem::SendPlayerListRequest()
 		Builder,
 		GetTimeStamp(),
 		LoginProtocol::Payload::C2S_PlayerListRequest,
+		BodyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+	SendFlatBufferMessage(Builder);
+}
+
+void ULoginClientSubsystem::SendPlayerReadyRequest(const FString& SessionToken, const bool bIsReady)
+{
+	std::string TokenCharBuf = TCHAR_TO_UTF8(*SessionToken);
+	
+	flatbuffers::FlatBufferBuilder Builder;
+	auto TokenOffset = Builder.CreateString(TokenCharBuf);
+	auto BodyOffset = LoginProtocol::CreateC2S_GameReadyRequest(Builder,
+		TokenOffset,
+		bIsReady
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::C2S_GameReadyRequest,
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);

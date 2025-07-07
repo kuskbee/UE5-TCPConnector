@@ -187,6 +187,11 @@ void Server::ProcessPacket(std::vector<char>& RecvBuf, sql::Connection* ClientCo
 		ProcessPlayerListRequest(MsgEnvelope, ClientConn, ClientSocket);
 		break;
 	}
+	case LoginProtocol::Payload::C2S_GameReadyRequest:
+	{
+		ProcessGameReadyRequest(MsgEnvelope, ClientConn, ClientSocket);
+		break;
+	}
 	default:
 		std::cerr << "Unknown payload type\n";
 		break;
@@ -301,6 +306,33 @@ void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgE
 	SendFlatBufferMessage(ClientSocket, Builder);
 }
 
+void Server::ProcessGameReadyRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
+{
+	//BroadcastPlayerReady
+	const LoginProtocol::C2S_GameReadyRequest* ReadyReq = MsgEnvelope->body_as_C2S_GameReadyRequest();
+	std::string SessionToken = ReadyReq->session_token()->str();
+	bool bIsReady = ReadyReq->is_ready();
+
+	if (PlayerSessionMap.count(SessionToken) > 0)
+	{
+		PlayerSession& ReadyPlayer = PlayerSessionMap[SessionToken];
+		if (bIsReady)
+		{
+			ReadyPlayer.CurrentState = PlayerState::Ready;
+		}
+		else
+		{
+			ReadyPlayer.CurrentState = PlayerState::Lobby;
+		}
+		
+		BroadcastPlayerReady(ReadyPlayer);
+	}
+	else
+	{
+		std::cout << "<Bad Request> SessionToken[" << SessionToken << "] is Invalid!!" << std::endl;
+	}
+}
+
 void Server::BroadcastPlayerJoin(PlayerSession& JoinPlayer)
 {
 	flatbuffers::FlatBufferBuilder Builder;
@@ -350,16 +382,49 @@ void Server::BroadcastPlayerLeave(PlayerSession& LeavePlayer)
 		Nickname,
 		static_cast<LoginProtocol::PlayerState>(LeavePlayer.CurrentState)
 	);
-	auto SendMsgData = LoginProtocol::CreateS2C_PlayerInOutLobby(
+	auto InOutOffset = LoginProtocol::CreateS2C_PlayerInOutLobby(
 		Builder,
 		PlayerOffset,
 		false
+	);
+
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_PlayerInOutLobby,
+		InOutOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
 
 	for (const auto& Player : PlayerSessionMap)
 	{
 		std::cout << "[BroadcastPlayerLeave] User[" << LeavePlayer.UserId << "] Leave";
+		std::cout << "-> Broadcast UserId[" << Player.second.UserId << "]" << std::endl;
+
+		SendFlatBufferMessage(Player.second.Socket, Builder);
+	}
+}
+
+void Server::BroadcastPlayerReady(PlayerSession& ReadyPlayer)
+{
+	flatbuffers::FlatBufferBuilder Builder;
+	auto UserId = Builder.CreateString(ReadyPlayer.UserId);
+	auto ReadyOffset = LoginProtocol::CreateS2C_GameReady(
+		Builder,
+		UserId,
+		static_cast<LoginProtocol::PlayerState>(ReadyPlayer.CurrentState)
+	);
+	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
+		Builder,
+		GetTimeStamp(),
+		LoginProtocol::Payload::S2C_GameReady,
+		ReadyOffset.Union()
+	);
+	Builder.Finish(SendMsgData);
+
+	for (const auto& Player : PlayerSessionMap)
+	{
+		std::cout << "[BroadcastPlayerReady] User[" << ReadyPlayer.UserId << "] Leave";
 		std::cout << "-> Broadcast UserId[" << Player.second.UserId << "]" << std::endl;
 
 		SendFlatBufferMessage(Player.second.Socket, Builder);

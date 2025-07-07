@@ -20,6 +20,7 @@ enum S2C_Message : ushort
 	S2C_PlayerListResponse,
 	S2C_PlayerInOutLobby,
 	S2C_GameReady,
+	S2C_CountdownStartGame,
 	S2C_StartGame,
 	S2C_MatchmakingResponse
 }
@@ -113,6 +114,11 @@ table S2C_GameReady
 	state : PlayerState;
 }
 //------------------------------------
+table S2C_CountdownStartGame
+{
+	countdown: uint32;
+}
+//------------------------------------
 table S2C_StartGame
 {
 	dedi_ip_address: string;
@@ -150,6 +156,7 @@ union Payload
 	S2C_PlayerListResponse,
 	S2C_GameReady,
 	S2C_PlayerInOutLobby,
+	S2C_CountdownStartGame,
 	S2C_StartGame,
 	S2C_MatchmakingResponse
 }
