@@ -120,7 +120,17 @@ void ULoginClientSubsystem::NetworkPolling()
 
 		if (!LoginProtocol::VerifyMessageEnvelopeBuffer(verifier))
 		{
-			UE_LOG(LogTemp, Error, TEXT("Invalid FlatBuffer received"));
+			UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] Invalid FlatBuffer received"));
+
+			//:DEBUG:
+			const LoginProtocol::MessageEnvelope* MsgEnvelope = LoginProtocol::GetMessageEnvelope(RecvBuf.GetData());
+			if (!MsgEnvelope)
+			{
+				UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] Failed to GetMessageEnvelope"));
+				break;
+			}
+
+			UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] bodyType : [%d]"), MsgEnvelope->body_type());
 			break;
 		}
 
@@ -217,6 +227,16 @@ void ULoginClientSubsystem::ProcessPacket(TArray<uint8_t>& RecvBuf)
 		ProcessPlayerChangeState(MsgEnvelope);
 		break;
 	}
+	case LoginProtocol::Payload::S2C_CountdownStartGame:
+	{
+		ProcessCountdownStartGame(MsgEnvelope);
+		break;
+	}
+	case LoginProtocol::Payload::S2C_StartGame:
+	{
+		ProcessStartGame(MsgEnvelope);
+		break;
+	}
 	default:
 		UE_LOG(LogTemp, Error, TEXT("Unknown payload type [%d]"), static_cast<uint8_t>(MsgEnvelope->body_type()));
 		break;
@@ -304,6 +324,27 @@ void ULoginClientSubsystem::ProcessPlayerChangeState(const LoginProtocol::Messag
 	EPlayerState PlyState = static_cast<EPlayerState>(ChangeStateRes->state());
 
 	OnPlayerChangeStateDelegate.Broadcast(UserId, PlyState);
+}
+
+void ULoginClientSubsystem::ProcessCountdownStartGame(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+{
+	const LoginProtocol::S2C_CountdownStartGame* CountdownRes = MsgEnvelope->body_as_S2C_CountdownStartGame();
+
+	bool bIsStart = CountdownRes->is_start();
+	int RemainSeconds = CountdownRes->countdown();
+
+	OnCountdownStartGameDelegate.Broadcast(bIsStart, RemainSeconds);
+}
+
+void ULoginClientSubsystem::ProcessStartGame(const LoginProtocol::MessageEnvelope* MsgEnvelope)
+{
+	const LoginProtocol::S2C_StartGame* StartGameRes = MsgEnvelope->body_as_S2C_StartGame();
+
+	const char* Utf8DediIp = StartGameRes->dedi_ip_address()->c_str();
+	const FString DediIp = FString(UTF8_TO_TCHAR(Utf8DediIp));
+	const int DediPort = StartGameRes->dedi_port();
+
+	OnStartGameDelegate.Broadcast(DediIp, DediPort);
 }
 
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)

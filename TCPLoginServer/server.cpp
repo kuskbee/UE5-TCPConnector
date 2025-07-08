@@ -466,7 +466,7 @@ void Server::BroadcastStartGame()
 	auto SendMsgData = LoginProtocol::CreateMessageEnvelope(
 		Builder,
 		GetTimeStamp(),
-		LoginProtocol::Payload::S2C_CountdownStartGame,
+		LoginProtocol::Payload::S2C_StartGame,
 		StartGameOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
@@ -623,19 +623,24 @@ bool Server::IsCanStartCountdown()
 
 void Server::StartCountdown()
 {
-	if (bIsCountdownRunning)
+	bool expected = false;
+	if (!bIsCountdownRunning.compare_exchange_strong(expected, true))
 	{
-		return;
+		return; // 이미 돌고 있으면 끝
 	}
 
-	bIsCountdownRunning = true;
+	// 이전 스레드가 아직 joinable 인지 확인
+	if (CountdownThread && CountdownThread->joinable())
+	{
+		CountdownThread->detach();        // or join()
+	}
 
 	CountdownThread = std::make_shared<std::thread>([this]()
 	{
 		int32_t Remaining = CountdownSeconds;
 		while (Remaining > 0 && bIsCountdownRunning)
 		{
-			BroadcastCountdownStartGame(true, Remaining);
+			BroadcastCountdownStartGame(true, Remaining-1);
 			std::this_thread::sleep_for(std::chrono::seconds(1));
 			--Remaining;
 		}
@@ -646,6 +651,7 @@ void Server::StartCountdown()
 		}
 		bIsCountdownRunning = false;            // 플래그 리셋
 	});
+	CountdownThread->detach();
 }
 
 void Server::StopCountdown()
@@ -658,7 +664,9 @@ void Server::StopCountdown()
 
 	bIsCountdownRunning = false;
 	if (CountdownThread && CountdownThread->joinable())
+	{
 		CountdownThread->join();
+	}
 	CountdownThread.reset();
 
 	if (bBroadcastStop)

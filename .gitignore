@@ -114,3 +114,6 @@ Libraries/mysqlConnector/*
 *.iobj
 *.recipe
 *.ipdb
+
+# Package
+Package/*

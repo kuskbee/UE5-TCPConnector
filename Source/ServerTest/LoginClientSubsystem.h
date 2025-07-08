@@ -15,6 +15,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSignUpResponse, ELoginServerError
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerListResponse, const TArray<FPlayerInfo>&, PlayerInfos);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerInOutLobby, FPlayerInfo, PlayerInfo, bool, bIsJoin);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPlayerGameReady, FString, UserId, EPlayerState, CurrentState);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCountdownStartGame, bool, bIsStart, int, RemainSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnStartGame, FString, DediIp, int, DediPort);
 
 UCLASS()
 class SERVERTEST_API ULoginClientSubsystem : public UGameInstanceSubsystem
@@ -58,6 +60,8 @@ private:
 	void ProcessPlayerListResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessPlayerInOutLobby(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 	void ProcessPlayerChangeState(const LoginProtocol::MessageEnvelope* MsgEnvelope);
+	void ProcessCountdownStartGame(const LoginProtocol::MessageEnvelope* MsgEnvelope);
+	void ProcessStartGame(const LoginProtocol::MessageEnvelope* MsgEnvelope);
 
 	TObjectPtr<FSocket> Socket;
 	FTimerHandle NetworkTimerHandle;
@@ -78,4 +82,10 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FOnPlayerGameReady OnPlayerChangeStateDelegate;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnCountdownStartGame OnCountdownStartGameDelegate;
+	
+	UPROPERTY(BlueprintAssignable)
+	FOnStartGame OnStartGameDelegate;
 };
