@@ -480,7 +480,7 @@ bool Server::RecvAll(SOCKET Sock, char* RecvBuff, size_t RecvLen)
 	size_t Received = 0;
 	while (Received < RecvLen)
 	{
-		int RecvBytes = recv(Sock, RecvBuff + Received, int(RecvLen - Received), MSG_WAITALL);
+		int RecvBytes = recv(Sock, RecvBuff + Received, int(RecvLen - Received), 0);
 		if (RecvBytes <= 0)
 		{
 			if (RecvBytes == 0)
@@ -489,6 +489,9 @@ bool Server::RecvAll(SOCKET Sock, char* RecvBuff, size_t RecvLen)
 			}
 			else
 			{
+				const int Err = WSAGetLastError();
+				if (Err == WSAEWOULDBLOCK)      // 아직 일부만 도착 → 다시 루프
+					continue;
 				std::cerr << "RecvAll failed: " << WSAGetLastError() << std::endl;
 			}
 			return false;
@@ -569,6 +572,8 @@ bool Server::ReceiveFlatBufferMessage(SOCKET Sock, std::vector<char>& RecvBuf, u
 
 void Server::CleanUpClientSession(SOCKET ClientSocket)
 {
+	std::cout << "[CleanUp] Sock=" << ClientSocket << '\n';
+
 	std::string SessionToken;
 
 	{

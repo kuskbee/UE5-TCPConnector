@@ -13,6 +13,7 @@
 #include "SocketSubsystem.h"
 //#include "Sockets.h"
 //#include "Common/TcpSocketBuilder.h"
+#include "HAL/PlatformMisc.h"
 
 #include "UObject/EnumProperty.h"
 
@@ -73,17 +74,15 @@ void ULoginClientSubsystem::ConnectToServer(const FString& HostOrIp, int32 Port)
 				*HostOrIp, (int32)Result);
 			return;
 		}
-
-		// 포트 설정
-		Addr->SetPort(Port);
 	}
+
+	// 포트 설정
+	Addr->SetPort(Port);
 	
 	/*──────────────────────────────────────────────
 	 *  소켓 생성 ‧ 연결 시도
 	 *──────────────────────────────────────────────*/
-	Socket = FTcpSocketBuilder(TEXT("LoginClientSocket"))
-		/*.AsNonBlocking()*/
-		.Build();
+	Socket = FTcpSocketBuilder(TEXT("LoginClientSocket")).AsBlocking().Build();
 
 	if (!Socket || !Socket->Connect(*Addr))
 	{
@@ -100,10 +99,15 @@ void ULoginClientSubsystem::ConnectToServer(const FString& HostOrIp, int32 Port)
 	UE_LOG(LogTemp, Log, TEXT("Connected to Server: %s:%d"), *HostOrIp, Port);
 
 	/*──────────────────────────────────────────────
-	 *  네트워크 폴링 타이머 시작
-	 *    (주기적으로 데이터가 들어왔는지 체크)
+	 *  네트워크 수신 스레드 생성
 	 *──────────────────────────────────────────────*/
-	// 
+	bRunRecv = true;
+	LoginRecvThread = MakeUnique<std::thread>(&ULoginClientSubsystem::RecvLoop, this);
+	
+	/*──────────────────────────────────────────────
+	 *  네트워크 폴링 타이머 시작
+	 *    (주기적으로 수신 패킷 큐 체크)
+	 *──────────────────────────────────────────────*/
 	GetWorld()->GetTimerManager().SetTimer(NetworkTimerHandle, this, &ULoginClientSubsystem::NetworkPolling, 0.1f, true);
 }
 
@@ -111,14 +115,21 @@ void ULoginClientSubsystem::DisconnectFromServer()
 {
 	GetWorld()->GetTimerManager().ClearTimer(NetworkTimerHandle);
 
+	bRunRecv = false;
 	if (Socket)
 	{
+		Socket->Shutdown(ESocketShutdownMode::ReadWrite);
 		ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
-
 		SocketSubsystem->DestroySocket(Socket);
 		Socket = nullptr;
 		UE_LOG(LogTemp, Log, TEXT("Disconnected from server."));
 	}
+
+	if (LoginRecvThread && LoginRecvThread->joinable())
+	{
+		LoginRecvThread->join();
+	}
+	LoginRecvThread.Reset();
 }
 
 bool ULoginClientSubsystem::IsConnect()
@@ -135,41 +146,93 @@ void ULoginClientSubsystem::NetworkPolling()
 {
 	if (!Socket) return;
 
-	bool bHasData = Socket->Wait(ESocketWaitConditions::WaitForRead, 0);
-	if (!bHasData) return;
-
-	constexpr size_t READ_CHUNK = 64 * 1024; // 64KB
-	TArray<uint8_t> RecvBuf;
-	RecvBuf.Reserve(READ_CHUNK);
-
-	uint32 Size;
-	while (Socket && Socket->HasPendingData(Size))
+	TArray<uint8> Buf;
+	while (RecvPackets.Dequeue(Buf))
 	{
-		uint32_t MessageSize = 0;
-		bool bRecv = ReceiveFlatBufferMessage(RecvBuf, MessageSize);
-		if (false == bRecv)
+		if (Buf.Num() == 0) //  워커 종료 신호
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed ReceiveFlatBufferMessasge."));
-			break;
+			DisconnectFromServer();
+			return;
 		}
 
 		// FlatBuffer 검증
 		flatbuffers::Verifier verifier(
-			reinterpret_cast<const uint8_t*>(RecvBuf.GetData()), MessageSize);
+			reinterpret_cast<const uint8_t*>(Buf.GetData()), Buf.Num());
 
 		if (!LoginProtocol::VerifyMessageEnvelopeBuffer(verifier))
 		{
 			UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] Invalid FlatBuffer received"));
-			break;
+			continue;
 		}
 
 		// 메시지 디스패치
-		ProcessPacket(RecvBuf);
+		ProcessPacket(Buf);
 	}
+}
+
+void ULoginClientSubsystem::RecvLoop()
+{
+	FPlatformProcess::SetThreadName(TEXT("LoginRecv"));
+	FTimespan PollTimeout = FTimespan::FromMilliseconds(100);
+	constexpr size_t READ_CHUNK = 64 * 1024; // 64KB
+
+	TArray<uint8_t> HeaderBuffer;
+	int32 HeaderSize = (int32)sizeof(uint32_t);
+	HeaderBuffer.SetNumUninitialized(HeaderSize, EAllowShrinking::No);
+	
+	while(bRunRecv && Socket)
+	{
+
+		// 데이터 기다리기 (100 ms 타임아웃 → 다른 스레드가 bRunRecv를 내렸는지 체크)
+		if (!Socket->Wait(ESocketWaitConditions::WaitForRead, PollTimeout))
+			continue;
+
+		// 1. 메시지 길이 (4바이트) 수신
+		uint32_t networkMessageSize = 0;
+
+		int ReadBytes = 0;
+		//bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes);
+		bool bRecv = RecvAllBlocking(HeaderBuffer, HeaderSize);
+		if (bRecv == false)
+		{
+			UE_LOG(LogTemp, Error, TEXT("Receive message size failed."));
+			break;
+		}
+
+		int MessageSize = 0;
+		FMemory::Memcpy(&networkMessageSize, HeaderBuffer.GetData(), sizeof(uint32_t));
+		MessageSize = ntohl(networkMessageSize); // 호스트 바이트 순서로 변환
+
+		if (MessageSize == 0 || MessageSize > READ_CHUNK)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[RecvLoop] Bad pkt size"));
+			break;
+		}
+
+		// 2. 실제 메시지 데이터 수신
+		TArray<uint8> RecvBuf;
+		RecvBuf.SetNumUninitialized(MessageSize, EAllowShrinking::No);
+		bRecv = RecvAllBlocking(RecvBuf, MessageSize);
+		if (bRecv == false)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[RecvLoop] Receive message data failed."));
+			break;
+		}
+
+		RecvPackets.Enqueue(MoveTemp(RecvBuf)); // 게임 스레드로 전달
+	}
+
+	RecvPackets.Enqueue(TArray<uint8>()); // 종료 알림 (빈 배열)
 }
 
 bool ULoginClientSubsystem::SendFlatBufferMessage(flatbuffers::FlatBufferBuilder& Builder)
 {
+	if (!Socket)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ERROR] Failed SendFlatBufferMessage - Invalid Socket!"));
+		return false;
+	}
+
 	uint32 MessageSize = Builder.GetSize();
 	uint32 NetworkMessageSize = htonl(MessageSize);
 	int SentBytes = 0;
@@ -186,6 +249,8 @@ bool ULoginClientSubsystem::SendFlatBufferMessage(flatbuffers::FlatBufferBuilder
 		return false;
 	}
 
+	UE_LOG(LogTemp, Warning, TEXT("[SEND] %d bytes to Server"), MessageSize);
+
 	return true;
 }
 
@@ -198,8 +263,7 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	HeaderBuffer.AddZeroed(HeaderSize);
 	
 	int ReadBytes = 0;
-	//bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes);
-	bool bRecv = RecvAll(HeaderBuffer, HeaderSize);
+	bool bRecv = RecvAllBlocking(HeaderBuffer, HeaderSize);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message size failed."));
@@ -212,8 +276,7 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	// 2. 실제 메시지 데이터 수신
 
 	RecvBuf.SetNumUninitialized(outMessageSize);
-	//bRecv = Socket->Recv(RecvBuf.GetData(), outMessageSize, ReadBytes);
-	bRecv = RecvAll(RecvBuf, outMessageSize);
+	bRecv = RecvAllBlocking(RecvBuf, outMessageSize);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message data failed."));
@@ -222,24 +285,40 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	return true;
 }
 
-bool ULoginClientSubsystem::RecvAll(TArray<uint8_t>& RecvBuf, int32 RecvBufLen)
+bool ULoginClientSubsystem::RecvAllBlocking(TArray<uint8_t>& RecvBuf, int32 RecvBufLen)
 {
+	if (!Socket)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ERROR] Failed RecvAllBlocking - Invalid Socket!"));
+		return false;
+	}
+
 	int32 Received = 0;
 	while (Received < RecvBufLen)
 	{
 		int32 ReadBytes = 0;
-		//int RecvBytes = recv(Sock, RecvBuff + Received, int(RecvBufLen - Received), MSG_WAITALL);
-		bool bRecv = Socket->Recv(RecvBuf.GetData() + Received, RecvBufLen, ReadBytes);
+
+		bool bRecv = Socket->Recv(RecvBuf.GetData() + Received, RecvBufLen - Received, ReadBytes);
 		if (bRecv == false)
 		{
+			int32 Err = ISocketSubsystem::Get()->GetLastErrorCode();
+			if (Err == SE_EWOULDBLOCK)  // 아직 일부만 도착
+			{
+				continue;
+			}
+
 			if (ReadBytes == 0)
 			{
 				UE_LOG(LogTemp, Error, TEXT("[RecvAll] Server Socket disconnected."));
 			}
 			else
 			{
-				UE_LOG(LogTemp, Error, TEXT("RecvAll failed: "));
+				UE_LOG(LogTemp, Error, TEXT("RecvAll failed: [%d]"), Err);
 			}
+			return false;
+		}
+		if (ReadBytes == 0) //graceful close
+		{
 			return false;
 		}
 

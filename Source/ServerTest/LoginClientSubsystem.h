@@ -8,6 +8,9 @@
 #include "LoginProtocol_generated.h"
 #include "NetworkTypeDefine.h"
 #include "PlayerInfo.h"
+#include "Containers/Queue.h"
+
+#include <thread>
 #include "LoginClientSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnLoginResponse, ELoginServerErrorCode, ErrCode, FString, Nickname, FString, SessionToken);
@@ -50,10 +53,11 @@ public:
 
 private:
 	void NetworkPolling();
+	void RecvLoop();
 
 	bool SendFlatBufferMessage(flatbuffers::FlatBufferBuilder& Builder);
 	bool ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, uint32_t& outMessageSize);
-	bool RecvAll(TArray<uint8_t>& RecvBuf, int32 RecvBufLen);
+	bool RecvAllBlocking(TArray<uint8_t>& RecvBuf, int32 RecvBufLen);
 	
 	void ProcessPacket(TArray<uint8_t>& RecvBuf);
 
@@ -90,4 +94,11 @@ public:
 	
 	UPROPERTY(BlueprintAssignable)
 	FOnStartGame OnStartGameDelegate;
+
+	TUniquePtr<std::thread> LoginRecvThread;
+	std::atomic<bool> bRunRecv{ false };
+
+	// Spsc : Single Producer, Single Consumer
+	TQueue<TArray<uint8>, EQueueMode::Spsc> RecvPackets;
+
 };
