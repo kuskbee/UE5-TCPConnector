@@ -54,7 +54,7 @@ bool Server::Initialize()
 	memset(&ListenSocketAddr, 0, sizeof(ListenSocketAddr));
 	ListenSocketAddr.sin_family = AF_INET;
 	ListenSocketAddr.sin_addr.s_addr = INADDR_ANY; //****
-	ListenSocketAddr.sin_port = htons(8881);
+	ListenSocketAddr.sin_port = htons(29825);
 	Result = bind(ListenSocket, (sockaddr*)&ListenSocketAddr, sizeof(ListenSocketAddr));
 	if (Result == SOCKET_ERROR)
 	{
@@ -221,7 +221,7 @@ void Server::ProcessSignUpRequest(const LoginProtocol::MessageEnvelope* MsgEnvel
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
-	SendFlatBufferMessage(ClientSocket, Builder);
+	SendFlatBufferMessage(ClientSocket, Builder, (uint8_t)LoginProtocol::Payload::S2C_SignUpResponse);
 }
 
 void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
@@ -235,26 +235,16 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 	LoginStatus ResultStatus = DbManager.Login(
 		ClientConn, UserId, Password, PlayerId, Nickname);
 
+	PlayerSession JoinPlayer;
 	std::string SessionToken = "-";
 	if (ResultStatus == LoginStatus::Success)
 	{
 		SessionToken = util::UuidHelper::GenerateSessionToken();
-		PlayerSession JoinPlayer = PlayerSession{
+		JoinPlayer = PlayerSession{
 			PlayerId, UserId, Nickname, ClientSocket,
 			PlayerState::Lobby
 		};
-
-		BroadcastPlayerJoin(JoinPlayer);
-
-		{
-			std::unique_lock<std::shared_mutex> Lock(SessionMutex);
-
-			PlayerSessionMap[SessionToken] = JoinPlayer;
-			TokenByPlayerIdMap[PlayerId] = SessionToken;
-			TokenBySocketMap[ClientSocket] = SessionToken;
-		}
 	}
-
 	// 응답 FlatBuffer 작성
 	flatbuffers::FlatBufferBuilder Builder;
 	auto NickOffset = Builder.CreateString(Nickname);
@@ -272,7 +262,18 @@ void Server::ProcessLoginRequest(const LoginProtocol::MessageEnvelope* MsgEnvelo
 		BodyOffset.Union()
 	);
 	Builder.Finish(SendMsgData);
-	SendFlatBufferMessage(ClientSocket, Builder);
+	SendFlatBufferMessage(ClientSocket, Builder, (uint8_t)LoginProtocol::Payload::S2C_LoginResponse);
+
+	if (ResultStatus == LoginStatus::Success)
+	{
+		BroadcastPlayerJoin(JoinPlayer);
+
+		std::unique_lock<std::shared_mutex> Lock(SessionMutex);
+
+		PlayerSessionMap[SessionToken] = JoinPlayer;
+		TokenByPlayerIdMap[PlayerId] = SessionToken;
+		TokenBySocketMap[ClientSocket] = SessionToken;
+	}
 }
 
 void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
@@ -308,7 +309,7 @@ void Server::ProcessPlayerListRequest(const LoginProtocol::MessageEnvelope* MsgE
 		ResList.Union()
 	);
 	Builder.Finish(SendMsgData);
-	SendFlatBufferMessage(ClientSocket, Builder);
+	SendFlatBufferMessage(ClientSocket, Builder, (uint8_t)LoginProtocol::Payload::S2C_PlayerListResponse);
 }
 
 void Server::ProcessGameReadyRequest(const LoginProtocol::MessageEnvelope* MsgEnvelope, sql::Connection* ClientConn, SOCKET ClientSocket)
@@ -351,12 +352,12 @@ void Server::ProcessGameReadyRequest(const LoginProtocol::MessageEnvelope* MsgEn
 	}
 }
 
-void Server::BroadcastPacket(flatbuffers::FlatBufferBuilder& Builder)
+void Server::BroadcastPacket(flatbuffers::FlatBufferBuilder& Builder, uint8_t BodyType)
 {
 	std::shared_lock <std::shared_mutex> Lock(SessionMutex);
 	for (const auto& Player : PlayerSessionMap)
 	{
-		SendFlatBufferMessage(Player.second.Socket, Builder);
+		SendFlatBufferMessage(Player.second.Socket, Builder, BodyType);
 	}
 }
 
@@ -384,7 +385,7 @@ void Server::BroadcastPlayerJoin(PlayerSession& JoinPlayer)
 	);
 	Builder.Finish(SendMsgData);
 
-	BroadcastPacket(Builder);
+	BroadcastPacket(Builder, (uint8_t)LoginProtocol::Payload::S2C_PlayerInOutLobby);
 }
 
 void Server::BroadcastPlayerLeave(PlayerSession& LeavePlayer)
@@ -412,7 +413,7 @@ void Server::BroadcastPlayerLeave(PlayerSession& LeavePlayer)
 	);
 	Builder.Finish(SendMsgData);
 
-	BroadcastPacket(Builder);
+	BroadcastPacket(Builder, (uint8_t)LoginProtocol::Payload::S2C_PlayerInOutLobby);
 }
 
 void Server::BroadcastPlayerChangeState(PlayerSession& ChangePlayer)
@@ -432,7 +433,7 @@ void Server::BroadcastPlayerChangeState(PlayerSession& ChangePlayer)
 	);
 	Builder.Finish(SendMsgData);
 
-	BroadcastPacket(Builder);
+	BroadcastPacket(Builder, (uint8_t)LoginProtocol::Payload::S2C_PlayerChangeState);
 }
 
 void Server::BroadcastCountdownStartGame(const bool bIsStart, const int32_t RemainSeconds)
@@ -451,7 +452,7 @@ void Server::BroadcastCountdownStartGame(const bool bIsStart, const int32_t Rema
 	);
 	Builder.Finish(SendMsgData);
 
-	BroadcastPacket(Builder);
+	BroadcastPacket(Builder, (uint8_t)LoginProtocol::Payload::S2C_CountdownStartGame);
 }
 
 void Server::BroadcastStartGame()
@@ -471,7 +472,7 @@ void Server::BroadcastStartGame()
 	);
 	Builder.Finish(SendMsgData);
 
-	BroadcastPacket(Builder);
+	BroadcastPacket(Builder, (uint8_t)LoginProtocol::Payload::S2C_StartGame);
 }
 
 bool Server::RecvAll(SOCKET Sock, char* RecvBuff, size_t RecvLen)
@@ -515,7 +516,7 @@ bool Server::SendAll(SOCKET Sock, char* SendBuff, size_t SendLen)
 }
 
 // 메시지 전송 함수
-bool Server::SendFlatBufferMessage(SOCKET Sock, flatbuffers::FlatBufferBuilder& Builder)
+bool Server::SendFlatBufferMessage(SOCKET Sock, flatbuffers::FlatBufferBuilder& Builder, uint8_t BodyType)
 {
 	// 1. 메시지 길이 (4바이트) 전송
 	uint32_t MessageSize = Builder.GetSize();
@@ -532,6 +533,13 @@ bool Server::SendFlatBufferMessage(SOCKET Sock, flatbuffers::FlatBufferBuilder& 
 		std::cerr << "Send message data failed." << std::endl;
 		return false;
 	}
+
+	//:DEBUG:
+	if (BodyType != 0)
+	{
+		std::cout << "Socket[" << Sock << "] => MessageSize[" << MessageSize << "], bodyType[" << (int)BodyType << "]" << std::endl;
+	}
+	
 	return true;
 }
 

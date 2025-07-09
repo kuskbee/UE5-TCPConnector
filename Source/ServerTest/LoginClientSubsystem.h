@@ -29,7 +29,7 @@ public:
 	virtual void Deinitialize() override;
 
 	UFUNCTION(BlueprintCallable, Category = "TCP")
-	void ConnectToServer(const FString& IpAddress = "127.0.0.1", int32 Port = 8881);
+	void ConnectToServer(const FString& HostOrIp = "127.0.0.1", int32 Port = 29825);
 	
 	UFUNCTION(BlueprintCallable, Category = "TCP")
 	void DisconnectFromServer();
@@ -53,6 +53,8 @@ private:
 
 	bool SendFlatBufferMessage(flatbuffers::FlatBufferBuilder& Builder);
 	bool ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, uint32_t& outMessageSize);
+	bool RecvAll(TArray<uint8_t>& RecvBuf, int32 RecvBufLen);
+	
 	void ProcessPacket(TArray<uint8_t>& RecvBuf);
 
 	void ProcessLoginResponse(const LoginProtocol::MessageEnvelope* MsgEnvelope);

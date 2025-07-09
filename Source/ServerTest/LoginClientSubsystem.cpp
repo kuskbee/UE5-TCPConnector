@@ -30,7 +30,7 @@ void ULoginClientSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void ULoginClientSubsystem::ConnectToServer(const FString& IpAddress, int32 Port)
+void ULoginClientSubsystem::ConnectToServer(const FString& HostOrIp, int32 Port)
 {
 	if (Socket)
 	{
@@ -45,17 +45,49 @@ void ULoginClientSubsystem::ConnectToServer(const FString& IpAddress, int32 Port
 		return;
 	}
 
+
+	/*──────────────────────────────────────────────
+	*  Host 문자열 → FInternetAddr 변환
+	*    (IPv4 parsing → 실패 시 DNS lookup)
+	*──────────────────────────────────────────────*/
 	TSharedRef<FInternetAddr> Addr = SocketSubsystem->CreateInternetAddr();
 	FIPv4Address IPv4Addr;
-	FIPv4Address::Parse(IpAddress, IPv4Addr);
-	Addr->SetIp(IPv4Addr.Value);
-	Addr->SetPort(Port);
+	if (FIPv4Address::Parse(HostOrIp, IPv4Addr))
+	{
+		Addr->SetIp(IPv4Addr.Value);
+	}
+	else
+	{
+		ESocketErrors Result = SocketSubsystem->GetHostByName(
+			TCHAR_TO_ANSI(*HostOrIp),
+			*Addr
+		);
+		if (Result == ESocketErrors::SE_NO_ERROR)
+		{
+			FString ResolvedIP = Addr->ToString(false);
+			UE_LOG(LogTemp, Warning, TEXT("DNS resolved Addr [%s] to IP: [%s]"), *HostOrIp, *ResolvedIP);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[ERROR] DNS resolution Failed for %s (Error: %d)"),
+				*HostOrIp, (int32)Result);
+			return;
+		}
 
-	Socket = FTcpSocketBuilder(TEXT("LoginClientSocket")).AsNonBlocking().Build();
+		// 포트 설정
+		Addr->SetPort(Port);
+	}
+	
+	/*──────────────────────────────────────────────
+	 *  소켓 생성 ‧ 연결 시도
+	 *──────────────────────────────────────────────*/
+	Socket = FTcpSocketBuilder(TEXT("LoginClientSocket"))
+		/*.AsNonBlocking()*/
+		.Build();
 
 	if (!Socket || !Socket->Connect(*Addr))
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to connect to server: %s:%d"), *IpAddress, Port);
+		UE_LOG(LogTemp, Error, TEXT("Failed to connect to server: %s:%d"), *HostOrIp, Port);
 
 		if (Socket)
 		{
@@ -65,9 +97,13 @@ void ULoginClientSubsystem::ConnectToServer(const FString& IpAddress, int32 Port
 		return;
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Connected to Server: %s:%d"), *IpAddress, Port);
+	UE_LOG(LogTemp, Log, TEXT("Connected to Server: %s:%d"), *HostOrIp, Port);
 
-	// 주기적으로 데이터가 들어왔는지 체크하기 위한 타이머 시작
+	/*──────────────────────────────────────────────
+	 *  네트워크 폴링 타이머 시작
+	 *    (주기적으로 데이터가 들어왔는지 체크)
+	 *──────────────────────────────────────────────*/
+	// 
 	GetWorld()->GetTimerManager().SetTimer(NetworkTimerHandle, this, &ULoginClientSubsystem::NetworkPolling, 0.1f, true);
 }
 
@@ -99,6 +135,9 @@ void ULoginClientSubsystem::NetworkPolling()
 {
 	if (!Socket) return;
 
+	bool bHasData = Socket->Wait(ESocketWaitConditions::WaitForRead, 0);
+	if (!bHasData) return;
+
 	constexpr size_t READ_CHUNK = 64 * 1024; // 64KB
 	TArray<uint8_t> RecvBuf;
 	RecvBuf.Reserve(READ_CHUNK);
@@ -121,16 +160,6 @@ void ULoginClientSubsystem::NetworkPolling()
 		if (!LoginProtocol::VerifyMessageEnvelopeBuffer(verifier))
 		{
 			UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] Invalid FlatBuffer received"));
-
-			//:DEBUG:
-			const LoginProtocol::MessageEnvelope* MsgEnvelope = LoginProtocol::GetMessageEnvelope(RecvBuf.GetData());
-			if (!MsgEnvelope)
-			{
-				UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] Failed to GetMessageEnvelope"));
-				break;
-			}
-
-			UE_LOG(LogTemp, Error, TEXT("[VerifyMessage] bodyType : [%d]"), MsgEnvelope->body_type());
 			break;
 		}
 
@@ -169,7 +198,8 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	HeaderBuffer.AddZeroed(HeaderSize);
 	
 	int ReadBytes = 0;
-	bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes);
+	//bool bRecv = Socket->Recv(HeaderBuffer.GetData(), HeaderSize, ReadBytes);
+	bool bRecv = RecvAll(HeaderBuffer, HeaderSize);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message size failed."));
@@ -182,11 +212,38 @@ bool ULoginClientSubsystem::ReceiveFlatBufferMessage(TArray<uint8_t>& RecvBuf, u
 	// 2. 실제 메시지 데이터 수신
 
 	RecvBuf.SetNumUninitialized(outMessageSize);
-	bRecv = Socket->Recv(RecvBuf.GetData(), outMessageSize, ReadBytes);
+	//bRecv = Socket->Recv(RecvBuf.GetData(), outMessageSize, ReadBytes);
+	bRecv = RecvAll(RecvBuf, outMessageSize);
 	if (bRecv == false)
 	{
 		UE_LOG(LogTemp, Error, TEXT("Receive message data failed."));
 		return false;
+	}
+	return true;
+}
+
+bool ULoginClientSubsystem::RecvAll(TArray<uint8_t>& RecvBuf, int32 RecvBufLen)
+{
+	int32 Received = 0;
+	while (Received < RecvBufLen)
+	{
+		int32 ReadBytes = 0;
+		//int RecvBytes = recv(Sock, RecvBuff + Received, int(RecvBufLen - Received), MSG_WAITALL);
+		bool bRecv = Socket->Recv(RecvBuf.GetData() + Received, RecvBufLen, ReadBytes);
+		if (bRecv == false)
+		{
+			if (ReadBytes == 0)
+			{
+				UE_LOG(LogTemp, Error, TEXT("[RecvAll] Server Socket disconnected."));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("RecvAll failed: "));
+			}
+			return false;
+		}
+
+		Received += ReadBytes;
 	}
 	return true;
 }
@@ -344,7 +401,40 @@ void ULoginClientSubsystem::ProcessStartGame(const LoginProtocol::MessageEnvelop
 	const FString DediIp = FString(UTF8_TO_TCHAR(Utf8DediIp));
 	const int DediPort = StartGameRes->dedi_port();
 
-	OnStartGameDelegate.Broadcast(DediIp, DediPort);
+	FString ResultDediIp;
+
+	ISocketSubsystem* SocketSubsystem = ISocketSubsystem::Get(PLATFORM_SOCKETSUBSYSTEM);
+	if (!SocketSubsystem)
+	{
+		UE_LOG(LogTemp, Error, TEXT("Failed to get Socket Subsystem"));
+		return;
+	}
+	TSharedRef<FInternetAddr> Addr = SocketSubsystem->CreateInternetAddr();
+	FIPv4Address IPv4Addr;
+	if (FIPv4Address::Parse(DediIp, IPv4Addr))
+	{
+		ResultDediIp = DediIp;
+	}
+	else
+	{
+		ESocketErrors Result = SocketSubsystem->GetHostByName(
+			TCHAR_TO_ANSI(*DediIp),
+			*Addr
+		);
+		if (Result == ESocketErrors::SE_NO_ERROR)
+		{
+			ResultDediIp = Addr->ToString(false);
+			UE_LOG(LogTemp, Warning, TEXT("DNS resolved Addr [%s] to IP: [%s]"), *DediIp, *ResultDediIp);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("[ERROR] Failed Start Game!, DNS resolution Failed for %s (Error: %d)"),
+				*DediIp, (int32)Result);
+			return;
+		}
+	}
+
+	OnStartGameDelegate.Broadcast(ResultDediIp, DediPort);
 }
 
 void ULoginClientSubsystem::SendLoginRequest(const FString& UserId, const FString& Password)
